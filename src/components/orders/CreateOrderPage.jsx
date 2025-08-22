@@ -97,7 +97,7 @@ const CreateOrderPage = () => {
       unitvalue: "0",
       proddivision: "",
       stock_data: [],
-      pricelist_data: {},
+      // pricelist_data: {},
       Attribute_data: {},
       attribute: {}, // Added attribute
       scheduleDate: format(new Date(), "yyyy-MM-dd"),
@@ -137,7 +137,7 @@ const CreateOrderPage = () => {
           unitvalue: "0",
           proddivision: product.proddivision || "",
           stock_data: [],
-          pricelist_data: product?.pricelist_data || {},
+          // pricelist_data: product?.pricelist_data || {},
           Attribute_data: product.Attribute_data || {},
           attribute: {}, // Added attribute
           scheduleDate: format(new Date(), "yyyy-MM-dd"),
@@ -1300,7 +1300,7 @@ const CreateOrderPage = () => {
         unitvalue: "0",
         proddivision: "",
         stock_data: [],
-        pricelist_data: {},
+        // pricelist_data: {},
         Attribute_data: {},
         attribute: {}, // Added attribute
         scheduleDate: format(new Date(), "yyyy-MM-dd"),

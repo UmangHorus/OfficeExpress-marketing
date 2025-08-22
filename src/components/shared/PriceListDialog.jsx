@@ -19,10 +19,17 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { format, parseISO, isValid, parse, isAfter, isBefore } from "date-fns";
 import { toast } from "sonner";
-import { useSharedDataStore } from "@/stores/sharedData.store";
 import { HashLoader } from "react-spinners";
+import { useSharedDataStore } from "@/stores/sharedData.store";
 
-export const PriceListDialog = ({ open, setOpen, product, selectedProductPriceList, isSelectedProductPriceListLoading, onSave }) => {
+export const PriceListDialog = ({
+  open,
+  setOpen,
+  product,
+  selectedProductPriceList,
+  isSelectedProductPriceListLoading,
+  onSave,
+}) => {
   const { companyDetails } = useSharedDataStore();
   const [selectedPriceList, setSelectedPriceList] = useState("");
   const [priceLists, setPriceLists] = useState([]);
@@ -55,7 +62,7 @@ export const PriceListDialog = ({ open, setOpen, product, selectedProductPriceLi
 
   // Extract attribute code from text
   const extractAttributeCode = (text) => {
-    if (!text || typeof text !== "string") return null;
+    if (!text || typeof text != "string") return null;
     const match = text.match(/\((\d+)\)$/);
     return match ? match[1] : null;
   };
@@ -68,14 +75,19 @@ export const PriceListDialog = ({ open, setOpen, product, selectedProductPriceLi
 
   // Extract value from dynamic attribute
   const extractDynamicValue = (value) => {
-    if (!value || typeof value !== "string") return null;
+    if (!value || typeof value != "string") return null;
     const match = value.match(/^(.+?)\s*\(\d+\)$/);
     return match ? match[1].trim() : value.trim();
   };
 
   // Transform API data to table format and return both data and headers
   const transformPriceListData = (pricelistData) => {
-    if (!pricelistData || typeof pricelistData !== "object" || !pricelistData.header || !pricelistData.data) {
+    if (
+      !pricelistData ||
+      typeof pricelistData != "object" ||
+      !pricelistData.header ||
+      !pricelistData.data
+    ) {
       return { data: [], headers: [] };
     }
 
@@ -114,7 +126,7 @@ export const PriceListDialog = ({ open, setOpen, product, selectedProductPriceLi
       // Then handle dynamic attributes
       row.forEach((value) => {
         const code = extractAttributeCode(value);
-        if (code && attributeMap[code] !== undefined) {
+        if (code && attributeMap[code] != undefined) {
           const cleanValue = extractDynamicValue(value);
           if (cleanValue) {
             rowData[`col_${attributeMap[code]}`] = cleanValue;
@@ -191,7 +203,7 @@ export const PriceListDialog = ({ open, setOpen, product, selectedProductPriceLi
     }
 
     const selectedId = selectedPriceList || activePriceListId;
-    const selected = priceLists.find((pl) => pl.id === selectedId);
+    const selected = priceLists.find((pl) => pl.id == selectedId);
 
     if (selected) {
       onSave({
@@ -211,10 +223,10 @@ export const PriceListDialog = ({ open, setOpen, product, selectedProductPriceLi
     try {
       const parts = dateStr.split("-");
       if (
-        parts.length === 3 &&
-        parts[0].length === 2 &&
-        parts[1].length === 2 &&
-        parts[2].length === 4
+        parts.length == 3 &&
+        parts[0].length == 2 &&
+        parts[1].length == 2 &&
+        parts[2].length == 4
       ) {
         return dateStr;
       }
@@ -239,7 +251,7 @@ export const PriceListDialog = ({ open, setOpen, product, selectedProductPriceLi
     if (header.isSpecial) return true;
     return priceLists.some((row) => {
       const value = row[header.id];
-      return value !== null && value !== "" && value !== "-";
+      return value != null && value != "" && value != "-";
     });
   };
 
@@ -254,8 +266,10 @@ export const PriceListDialog = ({ open, setOpen, product, selectedProductPriceLi
           <div className="flex justify-center items-center py-8">
             <HashLoader color="#287f71" size={50} />
           </div>
-        ) : priceLists.length === 0 ? (
-          <p className="text-center py-4">No price lists available for this product.</p>
+        ) : priceLists.length == 0 ? (
+          <p className="text-center py-4">
+            No price lists available for this product.
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <RadioGroup
@@ -290,7 +304,7 @@ export const PriceListDialog = ({ open, setOpen, product, selectedProductPriceLi
                                   value={pl.id}
                                   id={`pl-${pl.id}`}
                                   checked={
-                                    (selectedPriceList || activePriceListId) ===
+                                    (selectedPriceList || activePriceListId) ==
                                     pl.id
                                   }
                                   className="text-white data-[state=checked]:border-[#287f71] [&[data-state=checked]>span>svg]:fill-[#287f71]"
@@ -311,7 +325,7 @@ export const PriceListDialog = ({ open, setOpen, product, selectedProductPriceLi
 
                           return (
                             <TableCell key={header.id} className="text-left">
-                              {value !== null && value !== "" ? value : "-"}
+                              {value != null && value != "" ? value : "-"}
                             </TableCell>
                           );
                         })}

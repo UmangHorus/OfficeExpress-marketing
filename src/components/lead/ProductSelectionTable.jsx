@@ -64,7 +64,6 @@ const ProductSelectionTable = ({
     setIsSelectedProductPriceListLoading,
   ] = useState(false);
 
-
   // Function to generate a unique ID
   const generateUniqueId = () => {
     return Date.now().toString() + Math.random().toString(36).substr(2, 9);
@@ -82,6 +81,7 @@ const ProductSelectionTable = ({
 
   const handleShowPriceList = async (product) => {
     setSelectedProduct(product);
+    setIsPriceListModalOpen(true);
     setIsSelectedProductPriceListLoading(true); // Start loading
     try {
       const response = await leadService.getProductPriceList(
@@ -92,7 +92,7 @@ const ProductSelectionTable = ({
       const productData = data?.DATA;
       if (data?.STATUS == "SUCCESS") {
         setSelectedProductPriceList(productData);
-        setIsPriceListModalOpen(true);
+        // setIsPriceListModalOpen(true);
       } else {
         toast.error(response?.MSG || "Failed to fetch price list");
       }
@@ -104,16 +104,144 @@ const ProductSelectionTable = ({
     }
   };
 
+  // const handlePriceListSave = (priceList) => {
+  //   const updatedFormValues = formValues.map((item) => {
+  //     if (item.unique_id == selectedProduct.unique_id) {
+  //       return {
+  //         ...item,
+  //         rate: priceList?.priceINR || item.rate,
+  //       };
+  //     }
+  //     return item;
+  //   });
+  //   setFormValues(updatedFormValues);
+  //   toast.success(`${priceList?.name || "Price list"} applied`, {
+  //     duration: 2000,
+  //   });
+  // };
+
   const handlePriceListSave = (priceList) => {
     const updatedFormValues = formValues.map((item) => {
       if (item.unique_id == selectedProduct.unique_id) {
-        return {
+        const isSecondaryRate =
+          selectedtypeOption == "salesorder-option" &&
+          secUnitConfig == "1" &&
+          item.unit_con_mode == "3" &&
+          item.conversion_flg == "2";
+
+        const newRate = priceList?.priceINR || item.rate;
+        const newSecUnitRate = isSecondaryRate
+          ? (
+              parseFloat(newRate) / (parseFloat(item.secondary_base_qty) || 1)
+            ).toFixed(2)
+          : item.sec_unit_rate;
+
+        const updatedItem = {
           ...item,
-          rate: priceList?.priceINR || item.rate,
+          rate: isSecondaryRate ? item.rate : newRate,
+          sec_unit_rate: isSecondaryRate ? newSecUnitRate : item.sec_unit_rate,
         };
+
+        // Recalculate dependent fields
+        let primaryQty = parseFloat(updatedItem.productqty) || 0;
+        let rate = parseFloat(updatedItem.rate) || 0;
+        let secUnitRate = parseFloat(updatedItem.sec_unit_rate) || 0;
+        let discount =
+          updatedItem.discount == ""
+            ? ""
+            : parseFloat(updatedItem.discount) || 0;
+        let discountAmount =
+          updatedItem.discount_amount == ""
+            ? ""
+            : parseFloat(updatedItem.discount_amount) || 0;
+        let subtotal = primaryQty * rate;
+
+        if (selectedtypeOption == "salesorder-option" && secUnitConfig == "1") {
+          const convFact = parseFloat(updatedItem.secondary_base_qty) || 0;
+          const conversionFlg = updatedItem.conversion_flg;
+          const unitConMode = updatedItem.unit_con_mode || "1";
+          let secondaryQty = parseFloat(updatedItem.SecQtyTotal) || 0;
+
+          if (conversionFlg == "1") {
+            secondaryQty =
+              convFact > 0 && primaryQty > 0
+                ? (primaryQty * convFact).toFixed(2)
+                : "0";
+            updatedItem.SecQtyTotal = secondaryQty;
+          } else if (conversionFlg == "2") {
+            primaryQty =
+              convFact > 0 && secondaryQty > 0
+                ? (secondaryQty / convFact).toFixed(2)
+                : "0";
+            updatedItem.productqty = primaryQty;
+          }
+
+          let calcSubtotal;
+          if (unitConMode == "3" && conversionFlg == "2") {
+            calcSubtotal = secondaryQty * secUnitRate;
+          } else {
+            calcSubtotal =
+              conversionFlg == "2" && unitConMode != "3"
+                ? secondaryQty * (rate / convFact)
+                : primaryQty * rate;
+          }
+
+          if (discount != "" && discount > 0) {
+            discountAmount = ((calcSubtotal * discount) / 100).toFixed(2);
+            updatedItem.discount_amount = discountAmount;
+          } else if (discountAmount != "" && discountAmount > 0) {
+            discount =
+              calcSubtotal > 0
+                ? ((discountAmount / calcSubtotal) * 100).toFixed(2)
+                : "";
+            updatedItem.discount = discount;
+          }
+
+          updatedItem.totalrate = (
+            calcSubtotal - (parseFloat(updatedItem.discount_amount) || 0)
+          ).toFixed(2);
+        } else {
+          if (updatedItem.unitvalue == "0") {
+            if (discount != "" && discount > 0) {
+              discountAmount = ((subtotal * discount) / 100).toFixed(2);
+              updatedItem.discount_amount = discountAmount;
+            } else if (discountAmount != "" && discountAmount > 0) {
+              discount =
+                subtotal > 0
+                  ? ((discountAmount / subtotal) * 100).toFixed(2)
+                  : "";
+              updatedItem.discount = discount;
+            }
+            updatedItem.totalrate = (
+              subtotal - (parseFloat(updatedItem.discount_amount) || 0)
+            ).toFixed(2);
+          } else {
+            const convFact = parseFloat(updatedItem.secondary_base_qty) || 0;
+            let newvalue =
+              convFact > 0 && primaryQty > 0 ? primaryQty / convFact : 0;
+            let adjustedSubtotal = newvalue * rate;
+
+            if (discount != "" && discount > 0) {
+              discountAmount = ((adjustedSubtotal * discount) / 100).toFixed(2);
+              updatedItem.discount_amount = discountAmount;
+            } else if (discountAmount != "" && discountAmount > 0) {
+              discount =
+                adjustedSubtotal > 0
+                  ? ((discountAmount / adjustedSubtotal) * 100).toFixed(2)
+                  : "";
+              updatedItem.discount = discount;
+            }
+            updatedItem.totalrate = (
+              adjustedSubtotal - (parseFloat(updatedItem.discount_amount) || 0)
+            ).toFixed(2);
+          }
+        }
+
+        return updatedItem;
       }
       return item;
     });
+
     setFormValues(updatedFormValues);
     toast.success(`${priceList?.name || "Price list"} applied`, {
       duration: 2000,
@@ -178,7 +306,7 @@ const ProductSelectionTable = ({
       productcode: product?.productcode || "",
       SecQtyReverseCalculate: product?.SecQtyReverseCalculate || "0",
       stock_data: product?.stock_data || [],
-      pricelist_data: product?.pricelist_data || {},
+      // pricelist_data: product?.pricelist_data || {},
       Attribute_data: product?.Attribute_data || {},
       attribute: {},
       proddivision: product?.proddivision || "",
@@ -332,7 +460,7 @@ const ProductSelectionTable = ({
       productcode: "",
       SecQtyReverseCalculate: "0",
       stock_data: [],
-      pricelist_data: {},
+      // pricelist_data: {},
       Attribute_data: {},
       attribute: {},
       proddivision: "",
@@ -410,8 +538,8 @@ const ProductSelectionTable = ({
         )
           ? productData?.stock_data
           : [];
-        newFormValues[index]["pricelist_data"] =
-          productData?.pricelist_data || {};
+        // newFormValues[index]["pricelist_data"] =
+        //   productData?.pricelist_data || {};
         newFormValues[index]["Attribute_data"] =
           productData?.Attribute_data || {};
         newFormValues[index]["attribute"] = {};
@@ -818,7 +946,7 @@ const ProductSelectionTable = ({
       SecQtyReverseCalculate: "0",
       proddivision: "",
       stock_data: [],
-      pricelist_data: {},
+      // pricelist_data: {},
       Attribute_data: {},
       attribute: {},
       scheduleDate: format(new Date(), "yyyy-MM-dd"),
@@ -890,7 +1018,7 @@ const ProductSelectionTable = ({
         unitvalue: "0",
         SecQtyReverseCalculate: "0",
         stock_data: [],
-        pricelist_data: {},
+        // pricelist_data: {},
         Attribute_data: {},
         attribute: {},
         proddivision: "",
@@ -952,15 +1080,20 @@ const ProductSelectionTable = ({
                   Attr
                 </TableHead>
               )}
-              {/* <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
+              <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
                 Price List
-              </TableHead> */}
+              </TableHead>
               <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
                 Image
               </TableHead>
               <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
                 Product
               </TableHead>
+               {enablestock == "Y" && (
+                <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
+                  Stock
+                </TableHead>
+              )}
               {selectedtypeOption == "salesorder-option" &&
                 secUnitConfig == "1" && (
                   <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
@@ -1003,11 +1136,7 @@ const ProductSelectionTable = ({
                     </TableHead>
                   </>
                 )}
-              {enablestock == "Y" && (
-                <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
-                  Stock
-                </TableHead>
-              )}
+             
               <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
                 MRP
               </TableHead>
@@ -1076,7 +1205,7 @@ const ProductSelectionTable = ({
                     </div>
                   </TableCell>
                 )}
-                {/* <TableCell className="text-left">
+                <TableCell className="text-left">
                   <div className="flex justify-center items-center">
                     <List
                       className={`${
@@ -1093,7 +1222,7 @@ const ProductSelectionTable = ({
                       disabled={!element.productid}
                     />
                   </div>
-                </TableCell> */}
+                </TableCell>
                 <TableCell className="text-left">
                   <img
                     alt="product-image"
@@ -1125,6 +1254,24 @@ const ProductSelectionTable = ({
                     </div>
                   )}
                 </TableCell>
+                {enablestock == "Y" && (
+                  <TableCell className="text-left">
+                    <div className="flex justify-center items-center">
+                      <Eye
+                        className={`text-[#26994e] ${
+                          element.productid
+                            ? "cursor-pointer"
+                            : "cursor-not-allowed opacity-50"
+                        }`}
+                        size={22}
+                        onClick={() =>
+                          element.productid && handleShowStock(element)
+                        }
+                        disabled={!element.productid}
+                      />
+                    </div>
+                  </TableCell>
+                )}
                 {selectedtypeOption == "salesorder-option" &&
                   secUnitConfig == "1" && (
                     <TableCell className="text-left">
@@ -1501,24 +1648,7 @@ const ProductSelectionTable = ({
                       </TableCell>
                     </>
                   )}
-                {enablestock == "Y" && (
-                  <TableCell className="text-left">
-                    <div className="flex justify-center items-center">
-                      <Eye
-                        className={`text-[#26994e] ${
-                          element.productid
-                            ? "cursor-pointer"
-                            : "cursor-not-allowed opacity-50"
-                        }`}
-                        size={22}
-                        onClick={() =>
-                          element.productid && handleShowStock(element)
-                        }
-                        disabled={!element.productid}
-                      />
-                    </div>
-                  </TableCell>
-                )}
+                
                 <TableCell className="text-left">
                   <span className="">
                     {!isNaN(parseFloat(element.mrp_price))
@@ -1663,37 +1793,27 @@ const ProductSelectionTable = ({
                     </div>
                   </div>
                 )}
-                {/* <div className="flex items-center">
+                <div className="flex items-center">
                   <label className="text-sm font-medium text-gray-500 w-32">
                     Price List:
                   </label>
                   <div className="flex items-center">
                     <List
                       className={`${
-                        element.productid &&
-                        element.pricelist_data &&
-                        Object.keys(element.pricelist_data || {}).length > 0
+                        element.productid
                           ? "text-[#26994e] cursor-pointer"
                           : "text-gray-400 cursor-not-allowed opacity-50"
                       }`}
                       size={22}
                       onClick={() => {
-                        if (
-                          element.productid &&
-                          element.pricelist_data &&
-                          Object.keys(element.pricelist_data || {}).length > 0
-                        ) {
+                        if (element.productid) {
                           handleShowPriceList(element);
                         }
                       }}
-                      disabled={
-                        !element.productid ||
-                        !element.pricelist_data ||
-                        Object.keys(element.pricelist_data || {}).length === 0
-                      }
+                      disabled={!element.productid}
                     />
                   </div>
-                </div> */}
+                </div>
                 <div className="flex items-center">
                   <label className="text-sm font-medium text-gray-500 w-32">
                     Image:
@@ -1708,6 +1828,53 @@ const ProductSelectionTable = ({
                     className="w-12 h-12"
                   />
                 </div>
+                
+                <div
+                  className={`${
+                    user?.isEmployee && !selectedContact
+                      ? "opacity-50 pointer-events-none"
+                      : ""
+                  } ${element.productid ? "flex items-center" : ""}`}
+                >
+                  <label className="text-sm font-medium text-gray-500 w-32">
+                    Product:
+                  </label>
+                  {element.productid ? (
+                    <div className="flex items-center">
+                      <span className="text-sm flex-1">
+                        {element.productname || ""} ({element.productcode || ""}
+                        )
+                      </span>
+                    </div>
+                  ) : (
+                    <ProductSearch
+                      products={productList}
+                      onSelect={(product) => productSelect(product, index)}
+                      className="mt-1"
+                    />
+                  )}
+                </div>
+                {enablestock == "Y" && (
+                  <div className="flex items-center">
+                    <label className="text-sm font-medium text-gray-500 w-32">
+                      Stock:
+                    </label>
+                    <div className="flex items-center">
+                      <Eye
+                        className={`text-[#26994e] ${
+                          element.productid
+                            ? "cursor-pointer"
+                            : "cursor-not-allowed opacity-50"
+                        }`}
+                        size={22}
+                        onClick={() =>
+                          element.productid && handleShowStock(element)
+                        }
+                        disabled={!element.productid}
+                      />
+                    </div>
+                  </div>
+                )}
                 {selectedtypeOption == "salesorder-option" &&
                   secUnitConfig == "1" && (
                     <div className="flex items-center">
@@ -1845,31 +2012,6 @@ const ProductSelectionTable = ({
                       </Select>
                     </div>
                   )}
-                <div
-                  className={`${
-                    user?.isEmployee && !selectedContact
-                      ? "opacity-50 pointer-events-none"
-                      : ""
-                  } ${element.productid ? "flex items-center" : ""}`}
-                >
-                  <label className="text-sm font-medium text-gray-500 w-32">
-                    Product:
-                  </label>
-                  {element.productid ? (
-                    <div className="flex items-center">
-                      <span className="text-sm flex-1">
-                        {element.productname || ""} ({element.productcode || ""}
-                        )
-                      </span>
-                    </div>
-                  ) : (
-                    <ProductSearch
-                      products={productList}
-                      onSelect={(product) => productSelect(product, index)}
-                      className="mt-1"
-                    />
-                  )}
-                </div>
                 {enablepacking == "Y" && (
                   <div className="flex items-center">
                     <label className="text-sm font-medium text-gray-500 w-32">
@@ -2138,27 +2280,7 @@ const ProductSelectionTable = ({
                       </div>
                     </>
                   )}
-                {enablestock == "Y" && (
-                  <div className="flex items-center">
-                    <label className="text-sm font-medium text-gray-500 w-32">
-                      Stock:
-                    </label>
-                    <div className="flex items-center">
-                      <Eye
-                        className={`text-[#26994e] ${
-                          element.productid
-                            ? "cursor-pointer"
-                            : "cursor-not-allowed opacity-50"
-                        }`}
-                        size={22}
-                        onClick={() =>
-                          element.productid && handleShowStock(element)
-                        }
-                        disabled={!element.productid}
-                      />
-                    </div>
-                  </div>
-                )}
+                
                 <div className="flex items-center">
                   <label className="text-sm font-medium text-gray-500 w-32">
                     MRP:
