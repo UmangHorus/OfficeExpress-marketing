@@ -71,6 +71,7 @@ const AttendanceReport = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [searchTrigger, setSearchTrigger] = useState(0);
   const isAdmin = appConfig?.main_admin_flg || "N";
+    // const isAdmin = appConfig?.isAdmin == 1 ? "Y" : "N" || "N";
   // 3. Update your searchParams state (if not already done)
   const [searchParams, setSearchParams] = useState({
     employeeId: loggedInUserId || "",

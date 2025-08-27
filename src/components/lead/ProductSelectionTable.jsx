@@ -307,6 +307,7 @@ const ProductSelectionTable = ({
       SecQtyReverseCalculate: product?.SecQtyReverseCalculate || "0",
       stock_data: product?.stock_data || [],
       // pricelist_data: product?.pricelist_data || {},
+      price_list_flg: product?.price_list_flg || false, // Added price_list_flg
       Attribute_data: product?.Attribute_data || {},
       attribute: {},
       proddivision: product?.proddivision || "",
@@ -461,6 +462,7 @@ const ProductSelectionTable = ({
       SecQtyReverseCalculate: "0",
       stock_data: [],
       // pricelist_data: {},
+      price_list_flg: false, // Added price_list_flg
       Attribute_data: {},
       attribute: {},
       proddivision: "",
@@ -540,6 +542,8 @@ const ProductSelectionTable = ({
           : [];
         // newFormValues[index]["pricelist_data"] =
         //   productData?.pricelist_data || {};
+        newFormValues[index]["price_list_flg"] =
+          productData?.price_list_flg || false;
         newFormValues[index]["Attribute_data"] =
           productData?.Attribute_data || {};
         newFormValues[index]["attribute"] = {};
@@ -947,6 +951,7 @@ const ProductSelectionTable = ({
       proddivision: "",
       stock_data: [],
       // pricelist_data: {},
+      price_list_flg: false, // Added price_list_flg
       Attribute_data: {},
       attribute: {},
       scheduleDate: format(new Date(), "yyyy-MM-dd"),
@@ -1019,6 +1024,7 @@ const ProductSelectionTable = ({
         SecQtyReverseCalculate: "0",
         stock_data: [],
         // pricelist_data: {},
+        price_list_flg: false, // Added price_list_flg
         Attribute_data: {},
         attribute: {},
         proddivision: "",
@@ -1080,16 +1086,18 @@ const ProductSelectionTable = ({
                   Attr
                 </TableHead>
               )}
-              <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
-                Price List
-              </TableHead>
+              {selectedtypeOption == "salesorder-option" && (
+                <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
+                  Price List
+                </TableHead>
+              )}
               <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
                 Image
               </TableHead>
               <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
                 Product
               </TableHead>
-               {enablestock == "Y" && (
+              {enablestock == "Y" && (
                 <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
                   Stock
                 </TableHead>
@@ -1136,7 +1144,7 @@ const ProductSelectionTable = ({
                     </TableHead>
                   </>
                 )}
-             
+
               <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
                 MRP
               </TableHead>
@@ -1205,24 +1213,28 @@ const ProductSelectionTable = ({
                     </div>
                   </TableCell>
                 )}
-                <TableCell className="text-left">
-                  <div className="flex justify-center items-center">
-                    <List
-                      className={`${
-                        element.productid
-                          ? "text-[#26994e] cursor-pointer"
-                          : "text-gray-400 cursor-not-allowed opacity-50"
-                      }`}
-                      size={22}
-                      onClick={() => {
-                        if (element.productid) {
-                          handleShowPriceList(element);
+                {selectedtypeOption == "salesorder-option" && (
+                  <TableCell className="text-left">
+                    <div className="flex justify-center items-center">
+                      <List
+                        className={`${
+                          element.productid && element?.price_list_flg
+                            ? "text-[#26994e] cursor-pointer"
+                            : "text-gray-400 cursor-not-allowed opacity-50"
+                        }`}
+                        size={22}
+                        onClick={() => {
+                          if (element.productid && element?.price_list_flg) {
+                            handleShowPriceList(element);
+                          }
+                        }}
+                        disabled={
+                          !element.productid || !element?.price_list_flg
                         }
-                      }}
-                      disabled={!element.productid}
-                    />
-                  </div>
-                </TableCell>
+                      />
+                    </div>
+                  </TableCell>
+                )}
                 <TableCell className="text-left">
                   <img
                     alt="product-image"
@@ -1648,7 +1660,7 @@ const ProductSelectionTable = ({
                       </TableCell>
                     </>
                   )}
-                
+
                 <TableCell className="text-left">
                   <span className="">
                     {!isNaN(parseFloat(element.mrp_price))
@@ -1793,27 +1805,31 @@ const ProductSelectionTable = ({
                     </div>
                   </div>
                 )}
-                <div className="flex items-center">
-                  <label className="text-sm font-medium text-gray-500 w-32">
-                    Price List:
-                  </label>
+                {selectedtypeOption == "salesorder-option" && (
                   <div className="flex items-center">
-                    <List
-                      className={`${
-                        element.productid
-                          ? "text-[#26994e] cursor-pointer"
-                          : "text-gray-400 cursor-not-allowed opacity-50"
-                      }`}
-                      size={22}
-                      onClick={() => {
-                        if (element.productid) {
-                          handleShowPriceList(element);
+                    <label className="text-sm font-medium text-gray-500 w-32">
+                      Price List:
+                    </label>
+                    <div className="flex items-center">
+                      <List
+                        className={`${
+                          element.productid && element?.price_list_flg
+                            ? "text-[#26994e] cursor-pointer"
+                            : "text-gray-400 cursor-not-allowed opacity-50"
+                        }`}
+                        size={22}
+                        onClick={() => {
+                          if (element.productid && element?.price_list_flg) {
+                            handleShowPriceList(element);
+                          }
+                        }}
+                        disabled={
+                          !element.productid || !element?.price_list_flg
                         }
-                      }}
-                      disabled={!element.productid}
-                    />
+                      />
+                    </div>
                   </div>
-                </div>
+                )}
                 <div className="flex items-center">
                   <label className="text-sm font-medium text-gray-500 w-32">
                     Image:
@@ -1828,7 +1844,7 @@ const ProductSelectionTable = ({
                     className="w-12 h-12"
                   />
                 </div>
-                
+
                 <div
                   className={`${
                     user?.isEmployee && !selectedContact
@@ -2280,7 +2296,7 @@ const ProductSelectionTable = ({
                       </div>
                     </>
                   )}
-                
+
                 <div className="flex items-center">
                   <label className="text-sm font-medium text-gray-500 w-32">
                     MRP:

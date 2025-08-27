@@ -29,25 +29,25 @@ export const EditLoginLogoutDialog = ({
   const [remark, setRemark] = useState("");
   const queryClient = useQueryClient();
 
-  useEffect(() => {
-    if (selectedRow) {
-      const parseTime = (timeStr) => {
-        if (!timeStr) return null;
-        const [time, period] = timeStr.split(" ");
-        const [h, m, s] = time.split(":").map(Number);
-        const date = new Date();
-        let hours = h;
-        if (period === "PM" && h < 12) hours += 12;
-        if (period === "AM" && h === 12) hours = 0;
-        date.setHours(hours, m, s || 0);
-        return date;
-      };
+  const parseTime = (timeStr) => {
+    if (!timeStr) return null;
+    const [time, period] = timeStr.split(" ");
+    const [h, m, s] = time.split(":").map(Number);
+    const date = new Date();
+    let hours = h;
+    if (period === "PM" && h < 12) hours += 12;
+    if (period === "AM" && h === 12) hours = 0;
+    date.setHours(hours, m, s || 0);
+    return date;
+  };
 
+  useEffect(() => {
+    if (open && selectedRow) {
       setLoginTime(parseTime(selectedRow.loginTime));
       setLogoutTime(parseTime(selectedRow.logoutTime));
-      setRemark("");
+      setRemark(selectedRow.remark || "");
     }
-  }, [selectedRow]);
+  }, [open, selectedRow]);
 
   useEffect(() => {
     updateHours();
@@ -95,6 +95,10 @@ export const EditLoginLogoutDialog = ({
 
   const updateLoginLogoutMutation = useMutation({
     mutationFn: async (values) => {
+      if (!values.loginTime || !values.logoutTime) {
+        throw new Error("Both login and logout times are required");
+      }
+
       const formattedLogin_Date = format(
         parse(values.date, "yyyy-MM-dd", new Date()),
         "dd-MM-yy"
@@ -151,6 +155,11 @@ export const EditLoginLogoutDialog = ({
   });
 
   const handleSave = () => {
+    if (!loginTime || !logoutTime) {
+      toast.error("Both login and logout times are required");
+      return;
+    }
+    
     updateLoginLogoutMutation.mutate({
       att_id: selectedRow?.id,
       date: selectedRow?.date,
@@ -160,8 +169,20 @@ export const EditLoginLogoutDialog = ({
     });
   };
 
+  const handleOpenChange = (isOpen) => {
+    setOpen(isOpen);
+    
+    // Reset state when dialog is closing
+    if (!isOpen) {
+      setLoginTime(null);
+      setLogoutTime(null);
+      setCalculatedHours("");
+      setRemark("");
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="w-[90vw] max-w-[425px] sm:max-w-[600px] lg:max-w-[800px] max-h-[90vh] overflow-y-auto bg-white p-4 sm:p-6 rounded-lg">
         <DialogHeader>
           <DialogTitle>Edit Login/Logout Details</DialogTitle>
@@ -185,31 +206,39 @@ export const EditLoginLogoutDialog = ({
           </div>
           <div className="grid gap-2">
             <Label>Login Time</Label>
-            <DatePicker
-              selected={loginTime}
-              onChange={(date) => setLoginTime(date)}
-              showTimeSelect
-              showTimeSelectOnly
-              timeIntervals={1}
-              timeCaption="Time"
-              dateFormat="h:mm:ss aa"
-              className="w-full p-2 border rounded-md input-focus-style"
-              placeholderText="Select login time"
-            />
+            <div className="relative loginlogout-datepicker-div">
+              <DatePicker
+                selected={loginTime}
+                onChange={(date) => setLoginTime(date)}
+                showTimeSelect
+                showTimeSelectOnly
+                timeIntervals={1}
+                timeCaption="Time"
+                dateFormat="h:mm:ss aa"
+                className="w-full p-2 border rounded-md input-focus-style h-10"
+                placeholderText="Select login time"
+                popperClassName="fixed z-50"
+                // popperPlacement="bottom-start"
+              />
+            </div>
           </div>
           <div className="grid gap-2">
             <Label>Logout Time</Label>
-            <DatePicker
-              selected={logoutTime}
-              onChange={(date) => setLogoutTime(date)}
-              showTimeSelect
-              showTimeSelectOnly
-              timeIntervals={1}
-              timeCaption="Time"
-              dateFormat="h:mm:ss aa"
-              className="w-full p-2 border rounded-md input-focus-style"
-              placeholderText="Select logout time"
-            />
+            <div className="relative loginlogout-datepicker-div">
+              <DatePicker
+                selected={logoutTime}
+                onChange={(date) => setLogoutTime(date)}
+                showTimeSelect
+                showTimeSelectOnly
+                timeIntervals={1}
+                timeCaption="Time"
+                dateFormat="h:mm:ss aa"
+                className="w-full p-2 border rounded-md input-focus-style h-10"
+                placeholderText="Select logout time"
+                popperClassName="fixed z-50"
+                // popperPlacement="bottom-start"
+              />
+            </div>
           </div>
           <div className="grid gap-2 sm:col-span-2">
             <Label>Login Hours</Label>
