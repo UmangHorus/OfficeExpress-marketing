@@ -156,13 +156,13 @@ const NewUserRegistrationForm = ({ mobile, onCancel }) => {
   }, [stateData, form]);
 
   const addContactMutation = useMutation({
-    mutationFn: async ({ data, selectedcompany }) => {
+    mutationFn: async ({ data, selectedcompany,inputvalue }) => {
       const contactData = {
         country: data.country,
         state: data.state,
         contact_title: data.title,
         name: data.name,
-        company_name: selectedcompany ? selectedcompany.title : "",
+        company_name: selectedcompany ? selectedcompany.title : inputvalue,
         email: data.Email,
         mobile: data.mobile,
         address1: data.address,
@@ -223,8 +223,8 @@ const NewUserRegistrationForm = ({ mobile, onCancel }) => {
     },
   });
 
-  const handleContactFormSubmit = (data) => {
-    addContactMutation.mutate({ data, selectedcompany: selectedCompany });
+  const handleContactFormSubmit = (data,selectedcompany,inputvalue) => {
+    addContactMutation.mutate({ data, selectedcompany: selectedCompany,inputvalue });
   };
 
   const handleMobileInput = async (e) => {

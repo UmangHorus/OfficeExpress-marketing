@@ -986,13 +986,13 @@ const CreateLeadPage = () => {
   }, [contactList, pendingContactDetails]);
 
   const addContactMutation = useMutation({
-    mutationFn: async ({ data, selectedcompany }) => {
+    mutationFn: async ({ data, selectedcompany,inputvalue }) => {
       const contactData = {
         country: data.country,
         state: data.state,
         contact_title: data.title,
         name: data.name,
-        company_name: selectedcompany ? selectedcompany.title : "", // Explicit fallback to ""
+        company_name: selectedcompany ? selectedcompany.title : inputvalue, // Explicit fallback to ""
         email: data.Email,
         mobile: data.mobile,
         address1: data.address,
@@ -1045,8 +1045,8 @@ const CreateLeadPage = () => {
     },
   });
 
-  const handleAddContact = (data, selectedcompany) => {
-    addContactMutation.mutate({ data, selectedcompany });
+  const handleAddContact = (data, selectedcompany,inputvalue) => {
+    addContactMutation.mutate({ data, selectedcompany,inputvalue });
   };
 
   const handleTabChange = (newTab) => {
