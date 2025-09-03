@@ -131,6 +131,7 @@ const CreateLeadPage = () => {
       discount: "",
       discount_amount: "",
       mrp_price: "",
+      sec_unit_mrp_rate: "",
       unit_con_mode: null,
       sec_unit_rate: "0",
     };
@@ -353,6 +354,7 @@ const CreateLeadPage = () => {
             discount: "",
             discount_amount: "",
             mrp_price: "",
+            sec_unit_mrp_rate: "",
             unit_con_mode: null,
             sec_unit_rate: "0",
           },
@@ -916,6 +918,7 @@ const CreateLeadPage = () => {
         discount: "",
         discount_amount: "",
         mrp_price: "",
+        sec_unit_mrp_rate: "",
         unit_con_mode: null,
         sec_unit_rate: "0",
       };
@@ -1080,6 +1083,7 @@ const CreateLeadPage = () => {
           discount: "",
           discount_amount: "",
           mrp_price: "",
+          sec_unit_mrp_rate: "",
           unit_con_mode: null,
           sec_unit_rate: "0",
         },

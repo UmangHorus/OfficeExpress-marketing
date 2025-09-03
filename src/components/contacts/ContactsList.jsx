@@ -39,6 +39,7 @@ import {
   UserPlus,
   ShoppingCart,
   Pencil,
+  Ruler,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -550,6 +551,15 @@ const ContactList = () => {
     router.push(`/orders/create?${queryParams.toString()}`); // 👈 Replaces URL
   };
 
+  const handleAddMeasurement = (id, type) => {
+    const queryParams = new URLSearchParams({
+      contact_id: id,
+      contact_type: type,
+      ev_id: visitorFound[0]?.ev_id || "",
+    });
+    router.push(`/measurements/add?${queryParams.toString()}`);  // 👈 Replaces URL
+  };
+
   const handleVisitIn = async (id, contactType) => {
     setDisabledVisitIn(true);
     try {
@@ -624,6 +634,9 @@ const ContactList = () => {
         break;
       case "order":
         handleAddOrder(id, contactType);
+        break;
+      case "measurement":
+        handleAddMeasurement(id, contactType);
         break;
       default:
         toast.error("Please select an action.");
@@ -728,8 +741,8 @@ const ContactList = () => {
               variant="default"
               size="sm"
               className={`mx-auto text-white w-full px-1 ${lead.ev_id
-                  ? "bg-[#4a5a6b] hover:bg-[#5c6b7a]"
-                  : "bg-[#287f71] hover:bg-[#20665a]"
+                ? "bg-[#4a5a6b] hover:bg-[#5c6b7a]"
+                : "bg-[#287f71] hover:bg-[#20665a]"
                 }`}
               onClick={() => handleVisitIn(lead.id, lead.contact_type)}
               disabled={disabledVisitIn || isVisitorMismatch}
@@ -754,7 +767,7 @@ const ContactList = () => {
                   size="sm"
                   disabled={true}
                   title="No location available"
-                  className="cursor-not-allowed"
+                  className="cursor-not-allowed "
                 >
                   <MapPin className="h-4 w-4 text-gray-400" />
                 </Button>
@@ -771,7 +784,7 @@ const ContactList = () => {
                     )}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[#287f71] hover:text-[#1a5c4d]"
+                    className="text-[#287f71] hover:text-[#1a5c4d] "
                   >
                     <MapPin className="h-4 w-4" />
                   </a>
@@ -1208,13 +1221,21 @@ const ContactList = () => {
               </SelectContent>
             </Select>
           </div>
-          <div className="text-sm text-muted-foreground">
+          {/* <div className="text-sm text-muted-foreground">
             {pagination.pageIndex * pagination.pageSize + 1}-
             {Math.min(
               (pagination.pageIndex + 1) * pagination.pageSize,
               filteredData.length
             )}{" "}
             of {filteredData.length} rows
+          </div> */}
+          <div className="text-sm text-muted-foreground">
+            {table.getFilteredRowModel().rows.length === 0
+              ? "0-0 of 0 rows"
+              : `${pagination.pageIndex * pagination.pageSize + 1}-${Math.min(
+                (pagination.pageIndex + 1) * pagination.pageSize,
+                table.getFilteredRowModel().rows.length
+              )} of ${table.getFilteredRowModel().rows.length} rows`}
           </div>
           <div className="flex pagination-buttons gap-2">
             <Button
@@ -1343,6 +1364,28 @@ const ContactList = () => {
                   </div>
                 </Label>
               </div>
+
+              {/* <div className="flex items-center space-x-3">
+                <RadioGroupItem
+                  value="measurement"
+                  id="measurement"
+                  className="text-white data-[state=checked]:border-[#287f71] [&[data-state=checked]>span>svg]:fill-[#287f71] h-5 w-5"
+                />
+                <Label
+                  htmlFor="measurement"
+                  className="flex items-center gap-2 font-normal cursor-pointer"
+                >
+                  <div className="p-2 rounded-lg bg-[#287f71]/10 text-[#287f71]">
+                    <Ruler className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="font-medium">Add Measurement</p>
+                    <p className="text-sm text-muted-foreground">
+                      Record a new measurement
+                    </p>
+                  </div>
+                </Label>
+              </div> */}
             </RadioGroup>
           </div>
           <DialogFooter className="flex justify-end gap-4 flex-row">

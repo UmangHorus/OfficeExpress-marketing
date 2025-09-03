@@ -30,6 +30,7 @@ import WonLeadDialog from "../shared/WonLeadDialog";
 import { ContactService } from "@/lib/ContactService";
 import { requestLocationPermission } from "@/utils/location";
 import useLocationPermission from "@/hooks/useLocationPermission";
+import { HashLoader } from "react-spinners";
 
 const CreateOrderPage = () => {
   const { user, token, navConfig, appConfig, location } = useLoginStore();
@@ -105,6 +106,7 @@ const CreateOrderPage = () => {
       discount: "",
       discount_amount: "",
       mrp_price: "",
+      sec_unit_mrp_rate: "",
       unit_con_mode: null,
       sec_unit_rate: "0",
     };
@@ -146,6 +148,7 @@ const CreateOrderPage = () => {
           discount: "",
           discount_amount: "",
           mrp_price: "",
+          sec_unit_mrp_rate: "",
           unit_con_mode: null,
           sec_unit_rate: "0",
         };
@@ -1145,7 +1148,7 @@ const CreateOrderPage = () => {
 
   // add contact mutation
   const addContactMutation = useMutation({
-    mutationFn: async ({ data, selectedcompany,inputvalue }) => {
+    mutationFn: async ({ data, selectedcompany, inputvalue }) => {
       const contactData = {
         country: data.country,
         state: data.state,
@@ -1204,8 +1207,8 @@ const CreateOrderPage = () => {
     },
   });
 
-  const handleAddContact = (data, selectedcompany,inputvalue) => {
-    addContactMutation.mutate({ data, selectedcompany,inputvalue });
+  const handleAddContact = (data, selectedcompany, inputvalue) => {
+    addContactMutation.mutate({ data, selectedcompany, inputvalue });
   };
 
   // add address mutation
@@ -1328,6 +1331,7 @@ const CreateOrderPage = () => {
         discount: "",
         discount_amount: "",
         mrp_price: "",
+        sec_unit_mrp_rate: "",
         unit_con_mode: null,
         sec_unit_rate: "0",
       };
@@ -1358,7 +1362,17 @@ const CreateOrderPage = () => {
     });
   };
 
+  // Add this at the top of the CreateOrderPage component, before the return statement
+  if (orderIdParam && !salesOrderDetails) {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-80 z-10">
+        <HashLoader color="#287f71" size={60} speedMultiplier={1.5} />
+      </div>
+    );
+  }
+
   return (
+
     <div className="space-y-6">
       <h1 className="text-lg font-semibold text-[#4a5a6b] flex items-center gap-2">
         <Columns2 />
