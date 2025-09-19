@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useLoginStore } from "@/stores/auth.store";
 import { Suspense } from "react";
+import MovedMessage from "@/components/auth/MovedMessage";
 
 function LoginContent() {
   const router = useRouter();
@@ -20,10 +21,16 @@ function LoginContent() {
   return <LoginForm />;
 }
 
+// comment by umang - old login page
+
+// export default function LoginPage() {
+//   return (
+//     <Suspense fallback={<div>Loading...</div>}>
+//       <LoginContent />
+//     </Suspense>
+//   );
+// }
+
 export default function LoginPage() {
-  return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <LoginContent />
-    </Suspense>
-  );
+  return <MovedMessage />;
 }
