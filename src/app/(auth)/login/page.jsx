@@ -21,16 +21,6 @@ function LoginContent() {
   return <LoginForm />;
 }
 
-// comment by umang - old login page
-
-// export default function LoginPage() {
-//   return (
-//     <Suspense fallback={<div>Loading...</div>}>
-//       <LoginContent />
-//     </Suspense>
-//   );
-// }
-
 export default function LoginPage() {
   return <MovedMessage />;
 }

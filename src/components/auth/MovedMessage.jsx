@@ -25,13 +25,6 @@ export default function MovedMessage() {
     // Construct the new URL
     const newUrl = `https://${subdomain}.hofficeexpress.com`;
     setNewWebsiteUrl(newUrl);
-
-    // Redirect after 5 seconds
-    const timer = setTimeout(() => {
-      window.location.href = newUrl;
-    }, 5000);
-    
-    return () => clearTimeout(timer);
   }, []);
   
   return (
@@ -109,7 +102,7 @@ export default function MovedMessage() {
           margin: "25px 0",
           fontSize: "16px"
         }}>
-          Redirecting in <span style={{fontWeight: "bold", color: "#2c5282"}}>5 seconds</span>...
+          Click the button below to continue to the new platform.
         </p>
         
         <div style={{ marginTop: "30px" }}>
@@ -138,7 +131,7 @@ export default function MovedMessage() {
               e.target.style.boxShadow = "0 2px 5px rgba(66, 153, 225, 0.3)";
             }}
           >
-            Continue Now
+            Continue to New Platform
           </button>
         </div>
       </div>
