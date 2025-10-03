@@ -151,6 +151,98 @@ export default function LoginForm() {
     },
   });
 
+  // const verifyOTPMutation = useMutation({
+  //   mutationFn: ({ mobile, otp }) => {
+  //     if (!otpData) {
+  //       throw new Error("OTP session expired. Please request a new OTP.");
+  //     }
+  //     return authService.verifyOTP(mobile, otp, otpData);
+  //   },
+  //   onSuccess: (data) => {
+  //     const responseData = Array.isArray(data) ? data[0] : data;
+  //     if (responseData?.STATUS === "SUCCESS") {
+  //       if (!responseData.PHPTOKEN) {
+  //         throw new Error("Authentication token missing");
+  //       }
+
+  //       if (!otpData.OBJECT_ID) {
+  //         login(
+  //           responseData.PHPTOKEN,
+  //           {
+  //             mobile: mobile,
+  //           },
+  //           responseData
+  //         );
+  //         setStep("register");
+  //         setCountdown(0);
+  //         toast.info("Please complete your registration.", {
+  //           duration: 2000,
+  //         });
+  //         return;
+  //       }
+
+  //       const { emp_in_time, emp_out_time, emp_breakid, att_id } =
+  //         responseData?.DATA;
+  //       const isProduction = process.env.NODE_ENV === "production";
+  //       const cookieExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  //       document.cookie = `token=${
+  //         responseData.PHPTOKEN
+  //       }; path=/; expires=${cookieExpiry.toUTCString()}${
+  //         isProduction ? "; secure; sameSite=strict" : ""
+  //       }`;
+  //       document.cookie = `isEmployee=${
+  //         otpData.isEmployee ? "true" : "false"
+  //       }; path=/; expires=${cookieExpiry.toUTCString()}${
+  //         isProduction ? "; secure; sameSite=strict" : ""
+  //       }`;
+  //       login(
+  //         responseData.PHPTOKEN,
+  //         {
+  //           id: otpData.OBJECT_ID,
+  //           name: otpData.employeeName,
+  //           mobile: mobile,
+  //           isEmployee: otpData.isEmployee,
+  //           enableOtp: otpData.enableOtp,
+  //           type: otpData.OBJECT_TYPE,
+  //           object_name: otpData.OBJECT_NAME,
+  //         },
+  //         responseData
+  //       );
+  //       setEmpInTime(emp_in_time);
+  //       setEmpOutTime(emp_out_time);
+  //       setBreakId(emp_breakid);
+  //       setAttrId(att_id);
+  //       setPunchIn(
+  //         (emp_in_time && emp_out_time) || (!emp_in_time && !emp_out_time)
+  //           ? true
+  //           : false
+  //       );
+  //       const redirectPath = otpData.isEmployee ? "/dashboard" : "/leads";
+  //       router.push(redirectPath);
+  //       toast.success(responseData.MSG || "Login successful!", {
+  //         duration: 2000,
+  //       });
+  //     } else {
+  //       throw new Error(responseData?.MSG || "OTP verification failed");
+  //     }
+  //   },
+  //   onError: (error) => {
+  //     const errorMessage =
+  //       error.response?.data?.MSG ||
+  //       (Array.isArray(error.response?.data)
+  //         ? error.response?.data[0]?.MSG
+  //         : null) ||
+  //       error.message ||
+  //       "OTP verification failed";
+  //     toast.error(errorMessage, {
+  //       duration: 3000,
+  //     });
+  //     setOtpError(errorMessage);
+  //     setOtpValue("");
+  //     setTimeout(() => otpInputRef.current?.focus(), 100);
+  //   },
+  // });
+
   const verifyOTPMutation = useMutation({
     mutationFn: ({ mobile, otp }) => {
       if (!otpData) {
@@ -158,75 +250,86 @@ export default function LoginForm() {
       }
       return authService.verifyOTP(mobile, otp, otpData);
     },
-
     onSuccess: (data) => {
       const responseData = Array.isArray(data) ? data[0] : data;
+      if (responseData?.STATUS === "SUCCESS") {
+        if (!responseData.PHPTOKEN) {
+          throw new Error("Authentication token missing");
+        }
 
-      if (responseData?.STATUS !== "SUCCESS") {
+        if (!otpData.OBJECT_ID) {
+          login(
+            responseData.PHPTOKEN,
+            {
+              mobile: mobile,
+            },
+            responseData
+          );
+          setStep("register");
+          setCountdown(0);
+          toast.info("Please complete your registration.", {
+            duration: 2000,
+          });
+          return;
+        }
+
+        const { emp_in_time, emp_out_time, emp_breakid, att_id } =
+          responseData?.DATA;
+
+        // CHANGED: Single declaration of cookieExpiry and proper secure flag handling
+        const cookieExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 1 day expiry
+        const useSecureCookies =
+          process.env.NEXT_PUBLIC_COOKIE_SECURE === "true"; // Using NEXT_PUBLIC_ prefix
+
+        console.log("Cookie settings:", {
+          secure: useSecureCookies,
+          expiry: cookieExpiry.toUTCString(),
+        });
+
+        // Set cookies with proper configuration
+        document.cookie = `token=${
+          responseData.PHPTOKEN
+        }; path=/; expires=${cookieExpiry.toUTCString()}${
+          useSecureCookies ? "; secure" : ""
+        }`;
+        document.cookie = `isEmployee=${
+          otpData.isEmployee ? "true" : "false"
+        }; path=/; expires=${cookieExpiry.toUTCString()}${
+          useSecureCookies ? "; secure" : ""
+        }`;
+        login(
+          responseData.PHPTOKEN,
+          {
+            id: otpData.OBJECT_ID,
+            name: otpData.employeeName,
+            mobile: mobile,
+            isEmployee: otpData.isEmployee,
+            enableOtp: otpData.enableOtp,
+            type: otpData.OBJECT_TYPE,
+            object_name: otpData.OBJECT_NAME,
+          },
+          responseData
+        );
+        setEmpInTime(emp_in_time);
+        setEmpOutTime(emp_out_time);
+        setBreakId(emp_breakid);
+        setAttrId(att_id);
+        setPunchIn(
+          (emp_in_time && emp_out_time) || (!emp_in_time && !emp_out_time)
+            ? true
+            : false
+        );
+        // const redirectPath = otpData.isEmployee ? "/dashboard" : "/leads";
+        // router.push(redirectPath);
+        toast.success(responseData.MSG || "Login successful!", {
+          duration: 2000,
+        });
+        window.location.href = otpData.isEmployee ? "/dashboard" : "/leads";
+        return;
+      } else {
         throw new Error(responseData?.MSG || "OTP verification failed");
       }
-
-      if (!responseData.PHPTOKEN) {
-        throw new Error("Authentication token missing");
-      }
-
-      // ===== New User → Registration Flow =====
-      if (!otpData.OBJECT_ID) {
-        login(responseData.PHPTOKEN, { mobile }, responseData);
-        setStep("register");
-        setCountdown(0);
-        return;
-      }
-
-      // ===== Existing User Flow =====
-      const { emp_in_time, emp_out_time, emp_breakid, att_id } =
-        responseData?.DATA || {};
-      const isProduction = process.env.NODE_ENV === "production";
-      const cookieExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
-      // Set cookies before redirect
-      document.cookie = `token=${
-        responseData.PHPTOKEN
-      }; path=/; expires=${cookieExpiry.toUTCString()}${
-        isProduction ? "; secure; sameSite=strict" : ""
-      }`;
-      document.cookie = `isEmployee=${
-        otpData.isEmployee ? "true" : "false"
-      }; path=/; expires=${cookieExpiry.toUTCString()}${
-        isProduction ? "; secure; sameSite=strict" : ""
-      }`;
-
-      // Update global state
-      login(
-        responseData.PHPTOKEN,
-        {
-          id: otpData.OBJECT_ID,
-          name: otpData.employeeName,
-          mobile,
-          isEmployee: otpData.isEmployee,
-          enableOtp: otpData.enableOtp,
-          type: otpData.OBJECT_TYPE,
-          object_name: otpData.OBJECT_NAME,
-        },
-        responseData
-      );
-      setEmpInTime(emp_in_time);
-      setEmpOutTime(emp_out_time);
-      setBreakId(emp_breakid);
-      setAttrId(att_id);
-      setPunchIn(
-        (emp_in_time && emp_out_time) || (!emp_in_time && !emp_out_time)
-          ? true
-          : false
-      );
-
-      // ===== Instant Redirect (No toast) =====
-      setTimeout(() => {
-        const redirectPath = otpData.isEmployee ? "/dashboard" : "/leads";
-        router.replace(redirectPath);
-      }, 0);
     },
-
     onError: (error) => {
       const errorMessage =
         error.response?.data?.MSG ||
@@ -235,7 +338,9 @@ export default function LoginForm() {
           : null) ||
         error.message ||
         "OTP verification failed";
-
+      toast.error(errorMessage, {
+        duration: 3000,
+      });
       setOtpError(errorMessage);
       setOtpValue("");
       setTimeout(() => otpInputRef.current?.focus(), 100);

@@ -11,12 +11,13 @@ import LeadFollowupSettingsInitializer from "../LeadFollowupSettingsInitializer"
 import RouteListInitializer from "../RouteListInitializer";
 import { useLoginStore } from "@/stores/auth.store";
 import { getCurrentLocation, checkLocationPermission } from "@/utils/location";
+import TemplateListInitializer from "../TemplateListInitializer";
 
 export default function DashboardLayout({ children }) {
   const [loading, setLoading] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(true); // Sidebar visible by default
   const pathname = usePathname();
-  const { setLocation, setLocationError} = useLoginStore();
+  const { setLocation, setLocationError } = useLoginStore();
 
   useEffect(() => {
     const handleLocation = async () => {
@@ -70,23 +71,22 @@ export default function DashboardLayout({ children }) {
       {/* <BasicSettingsInitializer /> */}
       <PunchStatusInitializer />
       <LeadFollowupSettingsInitializer />
+      <TemplateListInitializer /> {/* Add the new initializer */}
       <RouteListInitializer />
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar - Hidden on mobile, toggleable on desktop */}
         <div
-          className={`hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 transition-transform duration-300 ease-in-out ${
-            sidebarVisible ? "translate-x-0" : "-translate-x-64"
-          }`}
+          className={`hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 transition-transform duration-300 ease-in-out ${sidebarVisible ? "translate-x-0" : "-translate-x-64"
+            }`}
         >
           <DashboardSidebar setLoading={setLoading} />
         </div>
 
         {/* Main Content Area */}
         <div
-          className={`flex flex-col flex-1 min-h-0 overflow-auto bg-[#e5edf4] transition-all duration-300 ease-in-out ${
-            sidebarVisible ? "md:ml-64" : "md:ml-0"
-          }`}
+          className={`flex flex-col flex-1 min-h-0 overflow-auto bg-[#e5edf4] transition-all duration-300 ease-in-out ${sidebarVisible ? "md:ml-64" : "md:ml-0"
+            }`}
         >
           <DashboardHeader
             toggleSidebar={toggleSidebar}

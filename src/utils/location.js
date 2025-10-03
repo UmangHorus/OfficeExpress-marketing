@@ -74,7 +74,7 @@ export const getCurrentLocation = async () => {
           2: "Position unavailable",
           3: "Request timed out",
         };
-        reject(new Error( "Location error"));
+        reject(new Error("Location error"));
       },
       options
     );

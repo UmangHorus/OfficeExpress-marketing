@@ -123,6 +123,22 @@ const OrderService = {
     return response.data;
   },
 
+  approveRejectOrder: async (token, salesorder_id, status_flg) => {
+  const formData = new FormData();
+  formData.append("AUTHORIZEKEY", AUTHORIZE_KEY);
+  formData.append("PHPTOKEN", token);
+  formData.append("salesorder_id", salesorder_id);
+  formData.append("status_flg", status_flg);
+
+  const response = await api.post(
+    "/expo_access_api/salesorderApproved",
+    formData
+  );
+  
+  // Return the first element of response data array
+  return Array.isArray(response.data) ? response.data[0] : response.data;
+},
+
   getLeadPastOrders: async (token, id, type) => {
     const payload = {
       AUTHORIZEKEY: AUTHORIZE_KEY,
@@ -476,6 +492,115 @@ const OrderService = {
       if (error.message.includes("LOCATION_PERMISSION_REQUIRED")) {
         throw new Error(
           "Location access is required for editing orders. Please enable location permissions."
+        );
+      }
+      throw error;
+    }
+  },
+
+  // New function to create order by quotation
+  CreateOrderByQuotation: async (orderData) => {
+    const formData = new FormData();
+    formData.append("AUTHORIZEKEY", AUTHORIZE_KEY);
+    formData.append("quotation_id", orderData?.quotationId);
+
+    try {
+      const locationPayload = await getLocationPayload();
+      if (locationPayload.error && orderData.location) {
+        if (orderData.location.gmapLink) {
+          formData.append("gmapurl", orderData.location.gmapLink);
+        }
+        if (orderData.location.address) {
+          formData.append("gmapAddress", orderData.location.address);
+        }
+      } else if (!locationPayload.error) {
+        if (locationPayload.gmapurl) {
+          formData.append("gmapurl", locationPayload.gmapurl);
+        }
+        if (locationPayload.gmapAddress) {
+          formData.append("gmapAddress", locationPayload.gmapAddress);
+        }
+      }
+
+      formData.append("contact_id", orderData.salesOrderDetails?.contact_id);
+      formData.append(
+        "object_type",
+        orderData.salesOrderDetails?.contact_type.toString()
+      );
+
+      if (orderData.user?.isEmployee) {
+        formData.append("created_assigned_by", orderData.user?.id);
+      }
+
+      formData.append("company_id", orderData.salesOrderDetails?.company_id);
+      formData.append("branch_id", orderData.salesOrderDetails?.branch_id);
+      formData.append("create_from", "OE");
+      formData.append("division_id", orderData.salesOrderDetails?.division_id);
+
+      if (orderData.salesOrderDetails?.patient_name) {
+        formData.append(
+          "patient_name",
+          orderData.salesOrderDetails.patient_name
+        );
+      }
+
+      if (orderData?.deliveryType) {
+        formData.append(
+          "delivery_type",
+          orderData?.deliveryType == "pickup" ? "1" : "2"
+        );
+      }
+      if (orderData?.deliveryType == "delivery") {
+        if (orderData.isSameAddress) {
+          formData.append("billing_address_id", orderData.isSameAddress);
+          formData.append("shipping_address_id", orderData.isSameAddress);
+        } else if (orderData.billToAddress && orderData.shipToAddress) {
+          formData.append("billing_address_id", orderData.billToAddress);
+          formData.append("shipping_address_id", orderData.shipToAddress);
+        }
+      } else if (orderData?.deliveryType === "pickup") {
+        // No address fields for pickup
+      }
+
+      if (orderData?.selectedTerm) {
+        formData.append("payments_terms", orderData?.selectedTerm);
+      }
+      if (orderData?.selectedTerm == "F") {
+        formData.append("credit_days", orderData?.customDays);
+      }
+
+      if (orderData.user?.isEmployee) {
+        formData.append("created_by", orderData.user?.id);
+      }
+
+      if (orderData?.remarks) {
+        formData.append("remarks", orderData?.remarks);
+      }
+
+      if (orderData.formValues && orderData.formValues.length > 0) {
+        const formattedProducts = orderData.formValues.map((product) => {
+          const formattedDate = format(
+            new Date(product.scheduleDate),
+            "dd-MM-yyyy"
+          );
+          const { Attribute_data, ...productWithoutAttributes } = product;
+          return {
+            ...productWithoutAttributes,
+            scheduleDate: formattedDate,
+          };
+        });
+        formData.append("products", JSON.stringify(formattedProducts));
+      }
+
+      const response = await api.post(
+        "/expo_access_api/insertSoData/",
+        formData
+      );
+      return response.data;
+    } catch (error) {
+      if (error.message.includes("LOCATION_PERMISSION_REQUIRED")) {
+        throw new Error(
+          "Location access is required for creating orders. Please enable location permissions."
         );
       }
       throw error;

@@ -8,6 +8,7 @@ const initialState = {
   companyDetails: null,
   contactProfileName: null, // Added new state
   routeList: [], // Changed from null to empty array
+  templateList: null, // Add templateList to initial state
 };
 
 export const useSharedDataStore = create((set, get) => ({
@@ -22,6 +23,8 @@ export const useSharedDataStore = create((set, get) => ({
   setCompanyDetails: (data) => set({ companyDetails: data }),
   setContactProfileName: (name) => set({ contactProfileName: name }), // Added new action
   setRouteList: (data) => set({ routeList: data }),
+  setTemplateList: (data, isLoading, error) =>
+    set({ templateList: { data, isLoading, error } }), // Add setTemplateList action
 
   clearSharedData: () =>
     set({
@@ -32,6 +35,7 @@ export const useSharedDataStore = create((set, get) => ({
       companyDetails: null,
       contactProfileName: null, // Added to clear
       routeList: [], // Changed from null to empty array
+      templateList: null, // Clear templateList
     }),
 
   debugStore: () => {
@@ -44,6 +48,7 @@ export const useSharedDataStore = create((set, get) => ({
       companyDetails: state.companyDetails,
       contactProfileName: state.contactProfileName, // Added to debug
       routeList: state.routeList, // Changed from null to empty array
+      templateList: state.templateList, // Add to debug
     });
     return state;
   },

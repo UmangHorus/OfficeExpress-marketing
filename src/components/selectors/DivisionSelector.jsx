@@ -13,8 +13,10 @@ const DivisionSelector = ({
   options,
   value,
   onValueChange,
-  orderIdParam,
-  salesOrderDetails,
+  // Support multiple entity types
+  entityIdParam,
+  entityDetails,
+  entityType = "order", // Default to order, but can be 'quotation', 'lead', 'invoice', etc.
 }) => {
   const { user } = useLoginStore();
   const { companyDetails } = useSharedDataStore();
@@ -27,26 +29,50 @@ const DivisionSelector = ({
       !user?.isEmployee &&
       companyDivisions.length > 0 &&
       !value &&
-      !orderIdParam
+      !entityIdParam
     ) {
       onValueChange(companyDivisions[0].div_id);
     }
-  }, [user?.isEmployee, companyDivisions, value, onValueChange, orderIdParam, companyDetails]);
+  }, [user?.isEmployee, companyDivisions, value, onValueChange, entityIdParam, companyDetails]);
 
   // Don't render if divisions are not enabled
   if (companyDetails?.is_company_division_enabled !== 1) {
     return null;
   }
 
-  // If orderIdParam exists, display salesOrderDetails.division_name
-  if (orderIdParam && salesOrderDetails?.division_name) {
+  // Determine the division name based on entity type
+  const getEntityDivisionName = () => {
+    if (!entityDetails) return "N/A";
+    
+    switch (entityType) {
+      case "order":
+        return entityDetails.division_name || "N/A";
+      case "quotation":
+        return entityDetails.division_name || entityDetails.divisionName || "N/A";
+         case "order_by_quotation":
+        return entityDetails.division_name || entityDetails.divisionName || "N/A";
+      // case "lead":
+      //   return entityDetails.division || entityDetails.division_name || "N/A";
+      // case "invoice":
+      //   return entityDetails.billing_division || entityDetails.division_name || "N/A";
+      default:
+        // For future entities, try common property names
+        return entityDetails.division_name || 
+               entityDetails.divisionName || 
+               entityDetails.division || 
+               "N/A";
+    }
+  };
+
+  // If we have an entity ID parameter and entity details, display as read-only
+  if (entityIdParam && entityDetails) {
     return (
       <div className="space-y-2">
         <label className="block text-base font-medium text-[#4a5a6b]">
           Division
         </label>
         <div className="w-full border border-input bg-background px-3 py-2 rounded-md text-sm">
-          {salesOrderDetails.division_name || "N/A"}
+          {getEntityDivisionName()}
         </div>
       </div>
     );

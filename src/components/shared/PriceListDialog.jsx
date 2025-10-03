@@ -33,6 +33,7 @@ export const PriceListDialog = ({
   const { companyDetails } = useSharedDataStore();
   const [selectedPriceList, setSelectedPriceList] = useState("");
   const [priceLists, setPriceLists] = useState([]);
+  const [filteredPriceLists, setFilteredPriceLists] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [tableHeaders, setTableHeaders] = useState([]);
   const [activePriceListId, setActivePriceListId] = useState("");
@@ -78,6 +79,56 @@ export const PriceListDialog = ({
     if (!value || typeof value != "string") return null;
     const match = value.match(/^(.+?)\s*\(\d+\)$/);
     return match ? match[1].trim() : value.trim();
+  };
+
+  // Get product attributes from product data
+  const getProductAttributes = () => {
+    if (!product?.attribute || !product?.Attribute_data) return {};
+
+    const attributes = {};
+    const attributeKeys = Object.keys(product.attribute);
+
+    if (attributeKeys.length == 0) return {};
+
+    // Get the first attribute object (assuming there's only one)
+    const productAttr = product.attribute[attributeKeys[0]];
+
+    // For each attribute in the product
+    Object.keys(productAttr).forEach(attrId => {
+      const valueId = productAttr[attrId];
+
+      if (product.Attribute_data[attrId] && product.Attribute_data[attrId].Masters) {
+        const master = product.Attribute_data[attrId].Masters[valueId];
+        if (master && master.N) {
+          attributes[attrId] = master.N;
+        }
+      }
+    });
+
+    return attributes;
+  };
+
+  // Filter price lists based on product attributes
+  const filterPriceListsByAttributes = (priceListsData, headers, productAttributes) => {
+    if (Object.keys(productAttributes).length == 0) return priceListsData;
+
+    return priceListsData.filter(priceList => {
+      // Check if this price list matches all product attributes
+      return Object.keys(productAttributes).every(attrId => {
+        // Find the header column that corresponds to this attribute
+        const attributeHeader = headers.find(header =>
+          header.isDynamic && header.code == attrId
+        );
+
+        if (!attributeHeader) return true; // No matching column, skip check
+
+        const columnValue = priceList[attributeHeader.id];
+        const productAttributeValue = productAttributes[attrId];
+
+        // Check if the values match
+        return columnValue == productAttributeValue;
+      });
+    });
   };
 
   // Transform API data to table format and return both data and headers
@@ -170,12 +221,23 @@ export const PriceListDialog = ({
         const { data: transformedData, headers: generatedHeaders } =
           transformPriceListData(selectedProductPriceList);
 
+        // Get product attributes
+        const productAttributes = getProductAttributes();
+
+        // Filter price lists based on product attributes
+        const filteredData = filterPriceListsByAttributes(
+          transformedData,
+          generatedHeaders,
+          productAttributes
+        );
+
         // Set both state variables
         setPriceLists(transformedData);
+        setFilteredPriceLists(filteredData);
         setTableHeaders(generatedHeaders);
 
-        // Find active price list with the transformed data
-        const activeId = findActivePriceList(transformedData);
+        // Find active price list with the filtered data
+        const activeId = findActivePriceList(filteredData);
         setActivePriceListId(activeId);
 
         // Initialize selected price list
@@ -184,12 +246,14 @@ export const PriceListDialog = ({
         console.error("Error transforming data:", error);
         toast.error("Failed to load price lists");
         setPriceLists([]);
+        setFilteredPriceLists([]);
         setTableHeaders([]);
       } finally {
         setIsLoading(false);
       }
     } else {
       setPriceLists([]);
+      setFilteredPriceLists([]);
       setTableHeaders([]);
       setSelectedPriceList("");
       setActivePriceListId("");
@@ -203,7 +267,7 @@ export const PriceListDialog = ({
     }
 
     const selectedId = selectedPriceList || activePriceListId;
-    const selected = priceLists.find((pl) => pl.id == selectedId);
+    const selected = filteredPriceLists.find((pl) => pl.id == selectedId);
 
     if (selected) {
       onSave({
@@ -249,9 +313,19 @@ export const PriceListDialog = ({
 
   const shouldDisplayColumn = (header) => {
     if (header.isSpecial) return true;
-    return priceLists.some((row) => {
+
+    // Check if this column contains numeric values (including 0)
+    const hasNumericValues = filteredPriceLists.some((row) => {
       const value = row[header.id];
-      return value != null && value != "" && value != "-";
+      return typeof value == 'number' || (!isNaN(parseFloat(value)) && isFinite(value));
+    });
+
+    if (hasNumericValues) return true;
+
+    // For non-numeric columns, check if they have any content
+    return filteredPriceLists.some((row) => {
+      const value = row[header.id];
+      return value != null && value != "" && value != undefined;
     });
   };
 
@@ -266,10 +340,18 @@ export const PriceListDialog = ({
           <div className="flex justify-center items-center py-8">
             <HashLoader color="#287f71" size={50} />
           </div>
-        ) : priceLists.length == 0 ? (
-          <p className="text-center py-4">
-            No price lists available for this product.
-          </p>
+        ) : filteredPriceLists.length == 0 ? (
+          <>
+            <p className="text-center py-4">
+              No matching price lists available for this product.
+            </p>
+            {/* <p className="text-center py-4">
+              No price lists match this product's specifications.
+              Please check if there are price lists available for
+              {product?.Attribute_data ? Object.values(product.Attribute_data).map(attr => attr.Name).join(" and ") : "this product category"}.
+            </p> */}
+          </>
+
         ) : (
           <div className="overflow-x-auto">
             <RadioGroup
@@ -292,7 +374,7 @@ export const PriceListDialog = ({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {priceLists.map((pl) => (
+                  {filteredPriceLists.map((pl) => (
                     <TableRow key={pl.id} className="text-center">
                       {tableHeaders
                         .filter((header) => shouldDisplayColumn(header))

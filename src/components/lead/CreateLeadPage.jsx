@@ -364,12 +364,12 @@ const CreateLeadPage = () => {
         if (contactIdParam && contactTypeParam && evIdParam) {
           const visitOutSuccess = await handleRecordVisitOut();
           if (visitOutSuccess) {
-            toast.success("Lead created and Visit Out recorded successfully.", {
+            toast.success(`${leadLabel} created and Visit Out recorded successfully.`, {
               duration: 2000,
             });
           } else {
             toast.success(
-              "Lead created successfully (Visit Out recording failed)",
+              `${leadLabel} created successfully (Visit Out recording failed)`,
               {
                 duration: 2000,
               }
@@ -378,7 +378,7 @@ const CreateLeadPage = () => {
           // Redirect to /contacts when params exist
           router.push("/contacts");
         } else {
-          toast.success("Lead created successfully", {
+          toast.success(`${leadLabel} created successfully`, {
             duration: 2000,
           });
           // Redirect to /leads when params are not present
@@ -401,7 +401,7 @@ const CreateLeadPage = () => {
 
       // Check if contact is selected
       if (user?.isEmployee && !selectedContact) {
-        toast.error("Please select a contact to proceed", {
+        toast.error(`Please select a ${contactLabel.toLowerCase()} to proceed`, {
           duration: 2000,
         });
         return;
@@ -494,8 +494,7 @@ const CreateLeadPage = () => {
         for (const product of formValues) {
           if (!product.productid || product.productid == "") {
             toast.error(
-              `Please select a valid product for ${
-                product.productname || "item"
+              `Please select a valid product for ${product.productname || "item"
               }`,
               {
                 duration: 2000,
@@ -510,8 +509,7 @@ const CreateLeadPage = () => {
           ) {
             // Modified check
             toast.error(
-              `Product ${
-                product.productname || "item"
+              `Product ${product.productname || "item"
               }: Quantity must be greater than 0`,
               {
                 duration: 2000,
@@ -989,7 +987,7 @@ const CreateLeadPage = () => {
   }, [contactList, pendingContactDetails]);
 
   const addContactMutation = useMutation({
-    mutationFn: async ({ data, selectedcompany,inputvalue }) => {
+    mutationFn: async ({ data, selectedcompany, inputvalue }) => {
       const contactData = {
         country: data.country,
         state: data.state,
@@ -1048,8 +1046,8 @@ const CreateLeadPage = () => {
     },
   });
 
-  const handleAddContact = (data, selectedcompany,inputvalue) => {
-    addContactMutation.mutate({ data, selectedcompany,inputvalue });
+  const handleAddContact = (data, selectedcompany, inputvalue) => {
+    addContactMutation.mutate({ data, selectedcompany, inputvalue });
   };
 
   const handleTabChange = (newTab) => {

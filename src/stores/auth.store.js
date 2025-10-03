@@ -71,6 +71,7 @@ export const useLoginStore = create(
             permissions: {
               showLeads: configData.lead_creation === "Y",
               showOrders: configData.order_creation === "Y",
+              showQuotations: configData.quotation_creation == "1",
             },
             labels: {
               leads: configData.lead_config_name || "Leads",

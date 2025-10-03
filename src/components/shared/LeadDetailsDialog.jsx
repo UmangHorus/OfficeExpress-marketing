@@ -28,12 +28,13 @@ import {
 } from "lucide-react";
 import { leadService } from "@/lib/leadService";
 import { useLoginStore } from "@/stores/auth.store";
+import api from "@/lib/api/axios";
 
 const LeadDetailsDialog = ({ leadId, open, onOpenChange }) => {
   const { navConfig } = useLoginStore();
 
-  const baseurl = process.env.NEXT_PUBLIC_API_BASE_URL_FALLBACK;
-  const imageurl = process.env.NEXT_PUBLIC_API_BASE_URL_FALLBACK?.replace(
+  const baseurl = api.defaults.baseURL;
+  const imageurl = api.defaults.baseURL?.replace(
     /^https?:\/\//,
     ""
   );

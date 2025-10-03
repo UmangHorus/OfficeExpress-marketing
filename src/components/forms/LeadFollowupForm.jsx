@@ -94,35 +94,47 @@ const LeadFollowupForm = ({
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!lead?.id) {
-      toast.error("Please select a lead.");
+      toast.error("Please select a lead.", {
+        duration: 2000,
+      });
       return;
     }
     if (!outcomeId) {
-      toast.error("Please select an outcome.");
+      toast.error("Please select an outcome.", {
+        duration: 2000,
+      });
       return;
     }
     if (!followupTypeId) {
-      toast.error("Please select a follow-up type.");
+      toast.error("Please select a follow-up type.", {
+        duration: 2000,
+      });
       return;
     }
     if (!followupDate) {
-      toast.error("Please select a follow-up date.");
+      toast.error("Please select a follow-up date.", {
+        duration: 2000,
+      });
       return;
     }
     if (!nextActionDate) {
-      toast.error("Please select a next action date.");
+      toast.error("Please select a next action date.", {
+        duration: 2000,
+      });
       return;
     }
     if (!description) {
-      toast.error("Please provide a description.");
+      toast.error("Please provide a remark.", {
+        duration: 2000,
+      });
       return;
     }
 
     setIsSubmitting(true);
     const followupData = {
       leadId: lead.id,
-      leadType : 7,     
-       outcomeId,
+      leadType: 7,
+      outcomeId,
       followupTypeId,
       description,
       followupDate,
@@ -145,7 +157,7 @@ const LeadFollowupForm = ({
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Outcome Field */}
               <div>
                 <Label htmlFor="outcome" className="text-sm font-medium">
@@ -263,13 +275,13 @@ const LeadFollowupForm = ({
               {/* Description */}
               <div>
                 <Label htmlFor="description" className="text-sm font-medium">
-                  Description <span className="text-red-500">*</span>
+                  Remark <span className="text-red-500">*</span>
                 </Label>
                 <Textarea
                   id="description"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Add Description"
+                  placeholder="Add Remark"
                   className="mt-1"
                   rows={4}
                 />

@@ -268,7 +268,7 @@ const ContactFollowupForm = ({
       return;
     }
     if (!description) {
-      toast.error("Please provide a description.");
+      toast.error("Please provide a remark.");
       return;
     }
 
@@ -484,13 +484,13 @@ const ContactFollowupForm = ({
               {/* Description */}
               <div>
                 <Label htmlFor="description" className="text-sm font-medium">
-                  Description <span className="text-red-500">*</span>
+                  Remark <span className="text-red-500">*</span>
                 </Label>
                 <Textarea
                   id="description"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Add Description"
+                  placeholder="Add Remark"
                   className="mt-1"
                   rows={4}
                 />

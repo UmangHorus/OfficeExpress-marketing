@@ -174,7 +174,7 @@ const ContactFollowup = () => {
       );
       toast.error(error.message, {
         position: "top-right",
-        duration: 3000,
+        duration: 2000,
       });
     }
   };

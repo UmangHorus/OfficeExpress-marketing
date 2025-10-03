@@ -17,6 +17,7 @@ const AddMeasurementPage = () => {
   const searchParams = useSearchParams();
   const contactId = searchParams.get("contact_id");
   const contactType = searchParams.get("contact_type");
+  const leadId = searchParams.get("lead_id");
   const evId = searchParams.get("ev_id");
 
   // State management
@@ -147,7 +148,7 @@ const AddMeasurementPage = () => {
         // onClick={handleAddMeasurement}
         disabled={productLoading || !formValues.some((item) => item.productid)}
       >
-        Add Measurement
+        Save Measurement
       </Button>
     </div>
   );

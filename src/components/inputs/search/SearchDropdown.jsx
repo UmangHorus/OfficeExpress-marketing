@@ -46,9 +46,12 @@ const SearchDropdown = ({
   const searchParams = useSearchParams();
   const contactId = searchParams?.get("contact_id");
   const orderId = searchParams?.get("orderId");
+  const quotationId = searchParams?.get("quotationId");
 
   const shouldDisable =
-    (!productSearch && !!contactId) || (!productSearch && !!orderId);
+    (!productSearch && !!contactId) ||
+    (!productSearch && !!orderId) ||
+    (!productSearch && !!quotationId);
 
   const handleItemSelect = (item) => {
     handleSelectItem(item);
@@ -60,23 +63,20 @@ const SearchDropdown = ({
     // Only apply fixed positioning on screens larger than mobile (md breakpoint)
     return window.innerWidth >= 768
       ? {
-          position: "fixed",
-          width: `${inputRef.current.offsetWidth}px`,
-          top: `${
-            inputRef.current.getBoundingClientRect().bottom + window.scrollY
+        position: "fixed",
+        width: `${inputRef.current.offsetWidth}px`,
+        top: `${inputRef.current.getBoundingClientRect().bottom + window.scrollY
           }px`,
-          left: `${
-            inputRef.current.getBoundingClientRect().left + window.scrollX
+        left: `${inputRef.current.getBoundingClientRect().left + window.scrollX
           }px`,
-        }
+      }
       : {};
   };
 
   return (
     <div
-      className={`${
-        productSearch ? "relative" : "relative"
-      } w-full ${className}`}
+      className={`${productSearch ? "relative" : "relative"
+        } w-full ${className}`}
     >
       <div className="relative">
         <Input
@@ -100,9 +100,8 @@ const SearchDropdown = ({
             setHighlightedIndex(-1);
           }}
           placeholder={internalSelectedItem ? "" : placeholder}
-          className={`${inputClassName} pr-8 truncate ${
-            shouldDisable ? "bg-gray-100 cursor-not-allowed" : ""
-          }`}
+          className={`${inputClassName} pr-8 truncate ${shouldDisable ? "bg-gray-100 cursor-not-allowed" : ""
+            }`}
           disabled={shouldDisable}
         />
         {internalSelectedItem && !shouldDisable && (
@@ -123,9 +122,8 @@ const SearchDropdown = ({
       {isOpen && !shouldDisable && (
         <div
           ref={dropdownRef}
-          className={`${
-            productSearch ? "" : "absolute"
-          } mt-1 w-full rounded-lg border border-gray-300 bg-white shadow-md max-h-64 overflow-auto z-50 ${dropdownClassName}`}
+          className={`${productSearch ? "" : "absolute"
+            } mt-1 w-full rounded-lg border border-gray-300 bg-white shadow-md max-h-64 overflow-auto z-50 ${dropdownClassName}`}
           style={productSearch ? getDropdownStyle() : {}}
         >
           {filteredItems.length === 0 ? (
@@ -144,11 +142,10 @@ const SearchDropdown = ({
                   <li
                     key={index}
                     onClick={() => handleItemSelect(item)}
-                    className={`py-2 px-4 cursor-pointer ${
-                      highlightedIndex == index
+                    className={`py-2 px-4 cursor-pointer ${highlightedIndex == index
                         ? "bg-gray-100"
                         : "hover:bg-gray-100"
-                    }`}
+                      }`}
                   >
                     {renderItem(item)}
                   </li>

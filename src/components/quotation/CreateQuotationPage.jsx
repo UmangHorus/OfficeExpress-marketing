@@ -6,7 +6,7 @@ import BranchSelector from "@/components/selectors/BranchSelector";
 import CompanySelector from "@/components/selectors/CompanySelector";
 import DivisionSelector from "@/components/selectors/DivisionSelector";
 import PaymentTermsSelector from "@/components/selectors/PaymentTermsSelector";
-import DeliveryOptions from "@/components/selectors/DeliveryOptions";
+import QuotationDeliveryOptions from "@/components/selectors/QuotationDeliveryOptions";
 import RemarksField from "@/components/inputs/RemarksField";
 import { Columns2 } from "lucide-react";
 import ProductSelectionTable from "@/components/lead/ProductSelectionTable";
@@ -16,9 +16,7 @@ import { useLoginStore } from "@/stores/auth.store";
 import { useSharedDataStore } from "@/stores/sharedData.store";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import OrderService from "@/lib/OrderService";
-import { format, parse } from "date-fns";
-import { leadService } from "@/lib/leadService";
+import { format } from "date-fns";
 import { Modal } from "../shared/Modal";
 import { ContactForm } from "../forms/ContactForm";
 import { OTPDialog } from "../shared/OtpDialog";
@@ -31,8 +29,10 @@ import { requestLocationPermission } from "@/utils/location";
 import useLocationPermission from "@/hooks/useLocationPermission";
 import { HashLoader } from "react-spinners";
 import { QuotationService } from "@/lib/QuotationService";
+import { leadService } from "@/lib/leadService";
+import OrderService from "@/lib/OrderService";
 
-const CreateOrderPage = () => {
+const CreateQuotationPage = () => {
   const { user, token, navConfig, appConfig, location } = useLoginStore();
   const searchParams = useSearchParams();
   const {
@@ -48,43 +48,38 @@ const CreateOrderPage = () => {
   const contactLabel = useLoginStore(
     (state) => state.navConfig?.labels?.contacts || "Contact"
   );
-  const orderLabel = useLoginStore(
-    (state) => state.navConfig?.labels?.orders || "Order"
+  const quotationLabel = useLoginStore(
+    (state) => state.navConfig?.labels?.Quotation_config_name || "Quotation"
   );
   const checkAndRequestLocation = useLocationPermission();
   const router = useRouter();
   const queryClient = useQueryClient();
   const secUnitConfig = companyDetails?.sec_unit_config || "0";
-  const ordersLabel = navConfig?.labels?.orders || "Sales Order";
+  const quotationsLabel = navConfig?.labels?.quotations || "Quotation";
   const addressType = companyDetails?.address_type || "";
-  const unitMaster = companyDetails?.unit_master; // Placeholder: Define your unit master data
+  const unitMaster = companyDetails?.unit_master;
   const contactIdParam = searchParams.get("contact_id");
   const contactTypeParam = searchParams.get("contact_type");
   const evIdParam = searchParams.get("ev_id");
-  const orderIdParam = searchParams.get("orderId");
   const quotationIdParam = searchParams.get("quotationId");
   const enabledOtpPortal = companyDetails?.enabled_otp_portal;
   const companies = companyBranchDivisionData?.companies || [];
   const divisions = companyBranchDivisionData?.division || [];
-  const [salesOrderDetails, setSalesOrderDetails] = useState(null);
   const [quotationDetails, setQuotationDetails] = useState(null);
-  const [selectedtypeOption, setSelectedTypeOption] =
-    useState("salesorder-option");
-  const [isSaveContact, setIsSaveContact] = useState(false); // New state for button disable
+  const [selectedtypeOption, setSelectedTypeOption] = useState("quotation-option");
+  const [isSaveContact, setIsSaveContact] = useState(false);
 
-  // Function to generate a unique ID (using timestamp for simplicity)
   const generateUniqueId = () => {
     return Date.now().toString() + Math.random().toString(36).substr(2, 9);
   };
 
-  // Initialize formValues
   const getInitialFormValues = (
     selectedtypeOption,
     secUnitConfig,
     selectedWonLead
   ) => {
     const baseFormValues = {
-      unique_id: generateUniqueId(), // Add unique_id
+      unique_id: generateUniqueId(),
       productid: "",
       productname: "",
       productqty: "",
@@ -100,9 +95,9 @@ const CreateOrderPage = () => {
       unitvalue: "0",
       proddivision: "",
       stock_data: [],
-      price_list_flg: false, // Added price_list_flg
+      price_list_flg: false,
       Attribute_data: {},
-      attribute: {}, // Added attribute
+      attribute: {},
       scheduleDate: format(new Date(), "yyyy-MM-dd"),
       discount: "",
       discount_amount: "",
@@ -123,7 +118,7 @@ const CreateOrderPage = () => {
     if (selectedWonLead?.products && selectedWonLead.products.length > 0) {
       const updatedFormValues = selectedWonLead.products.map((product) => {
         const baseProductValues = {
-          unique_id: product?.unique_id || generateUniqueId(), // Add unique_id
+          unique_id: product?.unique_id || generateUniqueId(),
           productid: product.product_id || "",
           productname: product.productname || "",
           productqty: "",
@@ -139,9 +134,9 @@ const CreateOrderPage = () => {
           unitvalue: "0",
           proddivision: product.proddivision || "",
           stock_data: [],
-          price_list_flg: product?.price_list_flg || false, // Added price_list_flg
+          price_list_flg: product?.price_list_flg || false,
           Attribute_data: product.Attribute_data || {},
-          attribute: {}, // Added attribute
+          attribute: {},
           scheduleDate: format(new Date(), "yyyy-MM-dd"),
           discount: "",
           discount_amount: "",
@@ -154,21 +149,19 @@ const CreateOrderPage = () => {
         if (selectedtypeOption == "lead-option") {
           return baseProductValues;
         } else if (
-          selectedtypeOption == "salesorder-option" &&
+          (selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") &&
           secUnitConfig == "0"
         ) {
           return baseProductValues;
         } else if (
-          selectedtypeOption == "salesorder-option" &&
+          (selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") &&
           secUnitConfig == "1"
         ) {
-          // Find matching primary unit ID
           const primaryUnit = unitMaster.find(
             (unit) =>
               unit.unit_name.toLowerCase() ==
               (product.unit_name || "").toLowerCase()
           );
-          // Find matching secondary unit ID
           const secondaryUnit = unitMaster.find(
             (unit) =>
               unit.unit_name.toLowerCase() ==
@@ -183,7 +176,7 @@ const CreateOrderPage = () => {
             SecQtyTotal: "",
           };
         } else {
-          return baseProductValues; // Default fallback
+          return baseProductValues;
         }
       });
       return updatedFormValues;
@@ -191,51 +184,45 @@ const CreateOrderPage = () => {
       if (selectedtypeOption == "lead-option") {
         return [baseFormValues];
       } else if (
-        selectedtypeOption == "salesorder-option" &&
+        (selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") &&
         secUnitConfig == "0"
       ) {
         return [baseFormValues];
       } else if (
-        selectedtypeOption == "salesorder-option" &&
+        (selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") &&
         secUnitConfig == "1"
       ) {
         return [enhancedFormValues];
       } else {
-        return [baseFormValues]; // Default fallback
+        return [baseFormValues];
       }
     }
   };
 
   const [selectedCompany, setSelectedCompany] = useState("");
   const [selectedDivision, setSelectedDivision] = useState("");
-  const [deliveryOption, setDeliveryOption] = useState("");
   const [remarks, setRemarks] = useState("");
   const [showAddButton, setShowAddButton] = useState(true);
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
   const [contactList, setContactList] = useState([]);
   const [productList, setProductList] = useState([]);
-  const [selectedContact, setSelectedContact] = useState(null); // Store selected contact
-  const [pendingContactDetails, setPendingContactDetails] = useState(null); // Store CONTACT_DETAILS
+  const [selectedContact, setSelectedContact] = useState(null);
+  const [pendingContactDetails, setPendingContactDetails] = useState(null);
   const [contactBillingAddresses, setContactBillingAddresses] = useState([]);
-
-  //won-lead related states
   const [wonLeadData, setWonLeadData] = useState([]);
   const [showClickHere, setShowClickHere] = useState(false);
   const [selectedWonLead, setSelectedWonLead] = useState(null);
   const [isWonLeadModalOpen, setIsWonLeadModalOpen] = useState(false);
-
-  // Delivery-related states
-  const [deliveryType, setDeliveryType] = useState("delivery");
-  const [billToAddress, setBillToAddress] = useState(null); // Stores address_id
-  const [shipToAddress, setShipToAddress] = useState(null); // Stores address_id
-  const [isSameAddress, setIsSameAddress] = useState(null); // Stores address_id if "same address" is
-
-  // Payment-related states
+  const [billToAddress, setBillToAddress] = useState(null);
+  const [shipToAddress, setShipToAddress] = useState(null);
+  const [isSameAddress, setIsSameAddress] = useState(null);
   const [selectedTerm, setSelectedTerm] = useState("F");
   const [customDays, setCustomDays] = useState("");
+  const [otpValue, setOtpValue] = useState("");
+  const [otpDialogOpen, setOtpDialogOpen] = useState(false);
+  const [otpKey, setOtpKey] = useState("");
 
-  // Payment options
   const paymentOptions = [
     { value: "A", label: "100% Advance" },
     { value: "F", label: "Full(Credit days)" },
@@ -243,7 +230,6 @@ const CreateOrderPage = () => {
     { value: "E", label: "EMI" },
   ];
 
-  // Transform contactBillingAddresses into deliveryOptions
   const deliveryOptions = contactBillingAddresses.map((address) => ({
     id: address.address_id,
     address: [
@@ -259,7 +245,6 @@ const CreateOrderPage = () => {
       .join(", "),
   }));
 
-  // Reset showClickHere and selectedLead when selectedContact is not available
   useEffect(() => {
     if (!selectedContact) {
       setShowClickHere(false);
@@ -270,18 +255,14 @@ const CreateOrderPage = () => {
     }
   }, [selectedContact]);
 
-  // Handle payment terms change
   const handlePaymentTermsChange = ({ term, days }) => {
     setSelectedTerm(term);
     setCustomDays(days);
   };
 
-  // Form values initialization
   const [formValues, setFormValues] = useState([]);
 
-  // Update formValues when secUnitConfig changes
   useEffect(() => {
-    // Only proceed if selectedWonLead exists
     if (selectedWonLead) {
       const newFormValues = getInitialFormValues(
         selectedtypeOption,
@@ -297,35 +278,6 @@ const CreateOrderPage = () => {
       setFormValues(newFormValues);
     }
   }, [selectedWonLead, selectedtypeOption, secUnitConfig]);
-
-  // Fetch sales order details
-  const {
-    data: salesOrderData,
-    error: salesOrderError,
-    isLoading: salesOrderLoading,
-  } = useQuery({
-    queryKey: ["salesOrderDetails", orderIdParam],
-    queryFn: () => OrderService.checkSalesorder(orderIdParam),
-    enabled: !!orderIdParam, // Only fetch if orderIdParam exists
-    refetchOnMount: "always", // Always refetch on component mount
-    staleTime: 0, // Data is immediately stale, forcing refetch
-    cacheTime: 0, // No caching after query becomes inactive
-    refetchOnWindowFocus: false, // Prevent refetch on window focus
-    retry: false, // Disable retries on failure
-    keepPreviousData: false, // Do not retain previous data during fetch
-  });
-
-  // Handle sales order data
-  useEffect(() => {
-    if (salesOrderData && salesOrderData[0]?.STATUS == "SUCCESS") {
-      setSalesOrderDetails(salesOrderData[0].DATA.salesorderdetail.Salesorder);
-    } else if (salesOrderData && salesOrderData[0]?.STATUS == "ERROR") {
-      console.error("Failed to fetch order details:", salesOrderData[0]?.MSG);
-    }
-    if (salesOrderError) {
-      console.error("Error fetching order details:", salesOrderError);
-    }
-  }, [salesOrderData, salesOrderError]);
 
   const {
     data: quotationData,
@@ -345,15 +297,7 @@ const CreateOrderPage = () => {
 
   useEffect(() => {
     if (quotationData && quotationData?.STATUS == "SUCCESS") {
-      const quotationDetail = quotationData?.DATA?.QuotationDetail?.Quotation;
-
-      // Ensure delivery_type is set to 2
-      const updatedQuotationDetails = {
-        ...quotationDetail,
-        delivery_type: 2,
-      };
-
-      setQuotationDetails(updatedQuotationDetails);
+      setQuotationDetails(quotationData?.DATA?.QuotationDetail?.Quotation);
     } else if (quotationData && quotationData?.STATUS == "ERROR") {
       console.error("Failed to fetch quotation details:", quotationData?.MSG);
     }
@@ -362,14 +306,8 @@ const CreateOrderPage = () => {
     }
   }, [quotationData, quotationError]);
 
-  const entityIdParam = orderIdParam || quotationIdParam;
-  const entityDetails = orderIdParam ? salesOrderDetails : quotationDetails;
-  const entityType = orderIdParam ? "order" : "order_by_quotation";
-
-  // Set selectedContact based on searchParams and contactList
   useEffect(() => {
-    if (searchParams && contactList?.length > 0 && !entityIdParam) {
-      // Map contact_type parameter to numeric type
+    if (searchParams && contactList?.length > 0 && !quotationIdParam) {
       let contactType;
       if (contactTypeParam == "C") {
         contactType = 1;
@@ -395,63 +333,55 @@ const CreateOrderPage = () => {
     contactList,
     contactIdParam,
     contactTypeParam,
-    entityIdParam,
+    quotationIdParam,
   ]);
 
-  // Set selectedContact based on entityDetails
   useEffect(() => {
-    if (entityDetails && contactList?.length > 0 && entityIdParam) {
-      const contactType = entityDetails.contact_type; // Numeric (1 or 6)
+    if (quotationDetails && contactList?.length > 0 && quotationIdParam) {
+      const contactType = quotationDetails.contact_type;
 
-      if (entityDetails.contact_id && contactType) {
+      if (quotationDetails.contact_id && contactType) {
         const foundContact = contactList.find(
           (contact) =>
-            contact.id == entityDetails.contact_id &&
+            contact.id == quotationDetails.contact_id &&
             contact.type == contactType
         );
 
         if (foundContact) {
           setSelectedContact(foundContact);
         } else {
-          console.warn("No matching contact found for sales order details");
+          console.warn("No matching contact found for quotation details");
         }
       }
     }
-  }, [entityDetails, contactList, entityIdParam]);
+  }, [quotationDetails, contactList, quotationIdParam]);
 
   useEffect(() => {
-    if (entityDetails && entityIdParam) {
-      // Check if billing and shipping address IDs exist
-      if (entityDetails.billing_address_id && entityDetails.shipping_address_id) {
-        // Compare billing and shipping address IDs
-        const isSame = entityDetails.billing_address_id == entityDetails.shipping_address_id;
-
-        // If addresses are the same, set isSameAddress, billToAddress, and shipToAddress to the same ID
+    if (quotationDetails && quotationIdParam) {
+      if (
+        quotationDetails.billing_address_id &&
+        quotationDetails.shipping_address_id
+      ) {
+        const isSame =
+          quotationDetails.billing_address_id ==
+          quotationDetails.shipping_address_id;
         if (isSame) {
-          setIsSameAddress(entityDetails.billing_address_id);
+          setIsSameAddress(quotationDetails.billing_address_id);
           setBillToAddress(null);
           setShipToAddress(null);
         } else {
-          // If addresses are different, set billToAddress and shipToAddress to their respective IDs
-          setIsSameAddress(null); // or set to another value like "" or false
-          setBillToAddress(entityDetails.billing_address_id);
-          setShipToAddress(entityDetails.shipping_address_id);
+          setIsSameAddress(null);
+          setBillToAddress(quotationDetails.billing_address_id);
+          setShipToAddress(quotationDetails.shipping_address_id);
         }
       }
     }
-  }, [entityDetails, entityIdParam]);
+  }, [quotationDetails, quotationIdParam]);
 
-  // OTP state and create lead state start
-  const [otpValue, setOtpValue] = useState("");
-  const [otpDialogOpen, setOtpDialogOpen] = useState(false);
-  const [otpKey, setOtpKey] = useState("");
-
-  // Mutations
   const generateOtpMutation = useMutation({
     mutationFn: (contactMobile) => leadService.generateOtp(contactMobile),
     onSuccess: (data, contactMobile) => {
       const responseData = Array.isArray(data) ? data[0] : data;
-
       if (responseData?.STATUS === "SUCCESS") {
         setOtpKey(responseData.DATA || "");
         setOtpDialogOpen(true);
@@ -481,40 +411,26 @@ const CreateOrderPage = () => {
       leadService.verifyOtp(contact, objectId, objectType, verifyOTP, key),
     onSuccess: async (data) => {
       const responseData = Array.isArray(data) ? data[0] : data;
-
       if (responseData?.STATUS === "SUCCESS") {
         if (!responseData.PHPTOKEN) {
           throw new Error("Authentication token missing");
         }
-        toast.success("OTP verified successfully. Proceeding to save order.", {
-          duration: 2000,
-        });
+        toast.success(
+          "OTP verified successfully. Proceeding to save quotation.",
+          {
+            duration: 2000,
+          }
+        );
 
-        // After successful OTP verification, save order data
-        if (orderIdParam) {
-          await saveEditOrderMutation.mutateAsync({
-            salesOrderDetails: salesOrderDetails,
+        if (quotationIdParam) {
+          await saveEditQuotationMutation.mutateAsync({
+            quotationDetails: quotationDetails,
             formValues: formValues,
             location: location,
             user: user,
-          });
-        } else if (quotationIdParam && entityType === "order_by_quotation") {
-          await saveOrderByQuotationMutation.mutateAsync({
-            salesOrderDetails: quotationDetails,
-            formValues: formValues,
-            location: location,
-            user: user,
-            billToAddress: billToAddress,
-            shipToAddress: shipToAddress,
-            isSameAddress: isSameAddress,
-            deliveryType: deliveryType,
-            selectedTerm: selectedTerm,
-            customDays: customDays,
-            remarks: remarks,
-            quotationId: quotationIdParam,
           });
         } else {
-          await saveOrderMutation.mutateAsync({
+          await saveQuotationMutation.mutateAsync({
             selectedContact: selectedContact,
             user: user,
             selectedCompany: selectedCompany,
@@ -527,7 +443,6 @@ const CreateOrderPage = () => {
             billToAddress: billToAddress,
             shipToAddress: shipToAddress,
             isSameAddress: isSameAddress,
-            deliveryType: deliveryType,
             selectedTerm: selectedTerm,
             customDays: customDays,
             remarks: remarks,
@@ -539,28 +454,24 @@ const CreateOrderPage = () => {
       }
     },
     onError: (error) => {
-      throw error; // Propagate to OTPDialog
+      throw error;
     },
   });
 
-  // Mutation for saving new order
-  const saveOrderMutation = useMutation({
-    mutationFn: (orderData) => {
-      if (!orderData) {
-        throw new Error("orderData is undefined");
+  const saveQuotationMutation = useMutation({
+    mutationFn: (quotationData) => {
+      if (!quotationData) {
+        throw new Error("quotationData is undefined");
       }
-      return OrderService.insertSOData(orderData);
+      return QuotationService.saveQuotationData(quotationData);
     },
     onSuccess: async (data) => {
       const responseData = Array.isArray(data) ? data[0] : data;
-
       if (responseData?.STATUS === "SUCCESS") {
-        // Reset form
         setFormValues(getInitialFormValues());
         setSelectedContact(null);
         setOtpValue("");
         setOtpKey("");
-        setDeliveryType("delivery");
         setBillToAddress(null);
         setShipToAddress(null);
         setIsSameAddress(null);
@@ -571,7 +482,6 @@ const CreateOrderPage = () => {
         setWonLeadData([]);
         setShowClickHere(false);
 
-        // Record Visit Out if params exist
         if (contactIdParam && contactTypeParam && evIdParam) {
           try {
             const referenceType = contactTypeParam == "C" ? "1" : "6";
@@ -587,7 +497,7 @@ const CreateOrderPage = () => {
             const visitorResult = visitorResponse[0] || {};
             if (visitorResult.STATUS == "SUCCESS") {
               toast.success(
-                `${orderLabel} created and Visit Out recorded successfully.`,
+                `${quotationLabel} created and Visit Out recorded successfully.`,
                 {
                   duration: 2000,
                 }
@@ -599,43 +509,42 @@ const CreateOrderPage = () => {
           } catch (error) {
             console.error("Error recording Visit Out:", error);
             toast.error(
-              `${orderLabel} created but failed to record Visit Out.`
+              `${quotationLabel} created but failed to record Visit Out.`
             );
           }
         } else {
-          toast.success(`${orderLabel} created successfully`, {
-            duration: 2000,
-          });
-          router.push("/orders");
+          toast.success(
+            `${quotationLabel} created successfully`,
+            {
+              duration: 2000,
+            }
+          );
+          router.push("/quotations");
         }
       } else {
-        throw new Error(responseData?.MSG || "Failed to save order");
+        throw new Error(responseData?.MSG || "Failed to save quotation");
       }
     },
     onError: (error) => {
-      console.error("Save order error:", error);
-      toast.error(error.message || "Failed to save order");
+      console.error("Save quotation error:", error);
+      toast.error(error.message || "Failed to save quotation");
     },
   });
 
-  // Mutation for saving new order from quotation
-  const saveOrderByQuotationMutation = useMutation({
-    mutationFn: (orderData) => {
-      if (!orderData) {
-        throw new Error("orderData is undefined");
+  const saveEditQuotationMutation = useMutation({
+    mutationFn: (quotationData) => {
+      if (!quotationData) {
+        throw new Error("quotationData is undefined");
       }
-      return OrderService.CreateOrderByQuotation(orderData);
+      return QuotationService.editQuotationData(quotationData);
     },
     onSuccess: async (data) => {
       const responseData = Array.isArray(data) ? data[0] : data;
-
       if (responseData?.STATUS === "SUCCESS") {
-        // Reset form
         setFormValues(getInitialFormValues());
         setSelectedContact(null);
         setOtpValue("");
         setOtpKey("");
-        setDeliveryType("delivery");
         setBillToAddress(null);
         setShipToAddress(null);
         setIsSameAddress(null);
@@ -645,76 +554,27 @@ const CreateOrderPage = () => {
         setSelectedWonLead(null);
         setWonLeadData([]);
         setShowClickHere(false);
-        setQuotationDetails(null); // Reset quotationDetails
 
-        // Clear quotationDetails query cache to ensure fresh fetch on next action
+        // Clear quotationDetails query cache to ensure fresh fetch on next edit
         queryClient.removeQueries({ queryKey: ["quotationDetails", quotationIdParam] });
 
-        toast.success(`${orderLabel} created successfully from quotation`, {
+        toast.success(`${quotationLabel} updated successfully`, {
           duration: 2000,
         });
-        router.push("/orders");
+        router.push("/quotations");
       } else {
-        throw new Error(responseData?.MSG || "Failed to create order from quotation");
+        throw new Error(responseData?.MSG || "Failed to update quotation");
       }
     },
     onError: (error) => {
-      console.error("Create order from quotation error:", error);
-      toast.error(error.message || "Failed to create order from quotation");
+      console.error("Update quotation error:", error);
+      toast.error(error.message || "Failed to update quotation");
     },
   });
 
-  // Mutation for editing existing order
-  const saveEditOrderMutation = useMutation({
-    mutationFn: (orderData) => {
-      if (!orderData) {
-        throw new Error("orderData is undefined");
-      }
-      return OrderService.editSOData(orderData);
-    },
-    onSuccess: async (data) => {
-      const responseData = Array.isArray(data) ? data[0] : data;
-
-      if (responseData?.STATUS === "SUCCESS") {
-        // Reset form
-        setFormValues(getInitialFormValues());
-        setSelectedContact(null);
-        setOtpValue("");
-        setOtpKey("");
-        setDeliveryType("delivery");
-        setBillToAddress(null);
-        setShipToAddress(null);
-        setIsSameAddress(null);
-        setSelectedTerm("F");
-        setCustomDays("");
-        setContactBillingAddresses([]);
-        setSelectedWonLead(null);
-        setWonLeadData([]);
-        setShowClickHere(false);
-        setSalesOrderDetails(null); // Reset salesOrderDetails
-
-        // Clear salesOrderDetails query cache to ensure fresh fetch on next edit
-        queryClient.removeQueries({ queryKey: ["salesOrderDetails", orderIdParam] });
-
-        toast.success(`${orderLabel} updated successfully`, {
-          duration: 2000,
-        });
-        router.push("/orders");
-      } else {
-        throw new Error(responseData?.MSG || "Failed to update order");
-      }
-    },
-    onError: (error) => {
-      console.error("Update order error:", error);
-      toast.error(error.message || "Failed to update order");
-    },
-  });
-
-  // create order function
-  const handleCreateOrder = async () => {
+  const handleCreateQuotation = async () => {
     try {
-      // Check location permissions
-      await checkAndRequestLocation(`${ordersLabel} creation`);
+      await checkAndRequestLocation(`${quotationsLabel} creation`);
 
       if (user?.isEmployee && !selectedContact) {
         toast.error(`Please select a ${contactLabel.toLowerCase()} to proceed`, {
@@ -723,7 +583,6 @@ const CreateOrderPage = () => {
         return;
       }
 
-      // Check if contact is selected
       if (user?.isEmployee && !selectedContact?.mobile) {
         toast.error(
           "The selected contact does not have a valid mobile number. OTP cannot be sent.",
@@ -734,7 +593,6 @@ const CreateOrderPage = () => {
         return;
       }
 
-      // Validate form for Select Products
       if (!formValues || formValues.length == 0) {
         toast.error("Please select at least one product to proceed", {
           duration: 2000,
@@ -742,7 +600,6 @@ const CreateOrderPage = () => {
         return;
       }
 
-      // Validate each product line item
       for (const product of formValues) {
         if (!product.productid || product.productid == "") {
           toast.error(
@@ -754,9 +611,7 @@ const CreateOrderPage = () => {
           return;
         }
 
-        // Check quantity based on conversion_flg
         if (product.conversion_flg == "1") {
-          // Validate productqty when conversion_flg is "1"
           if (
             !product.productqty ||
             product.productqty == "" ||
@@ -772,7 +627,6 @@ const CreateOrderPage = () => {
             return;
           }
         } else if (product.conversion_flg == "2") {
-          // Validate SecQtyTotal when conversion_flg is "2"
           if (
             !product.SecQtyTotal ||
             product.SecQtyTotal == "" ||
@@ -788,7 +642,6 @@ const CreateOrderPage = () => {
             return;
           }
         } else {
-          // Default case (if conversion_flg is neither "1" nor "2")
           if (
             !product.productqty ||
             product.productqty == "" ||
@@ -806,52 +659,31 @@ const CreateOrderPage = () => {
         }
       }
 
-      // Validate addresses for deliveryType === "delivery"
-      if (deliveryType == "delivery") {
-        if (!isSameAddress) {
-          // If isSameAddress is not set, check billToAddress and shipToAddress
-          if (!billToAddress) {
-            toast.error("Please select a bill to address", {
-              duration: 2000,
-            });
-            return;
-          }
-          if (!shipToAddress) {
-            toast.error("Please select a ship to address", {
-              duration: 2000,
-            });
-            return;
-          }
+      if (!isSameAddress) {
+        if (!billToAddress) {
+          toast.error("Please select a bill to address", {
+            duration: 2000,
+          });
+          return;
         }
-        // If isSameAddress is set, no further address validation needed
+        if (!shipToAddress) {
+          toast.error("Please select a ship to address", {
+            duration: 2000,
+          });
+          return;
+        }
       }
 
       if (!user?.isEmployee) {
-        // For Non-employees, directly save order without OTP
-        if (orderIdParam) {
-          await saveEditOrderMutation.mutateAsync({
-            salesOrderDetails: salesOrderDetails,
+        if (quotationIdParam) {
+          await saveEditQuotationMutation.mutateAsync({
+            quotationDetails: quotationDetails,
             formValues: formValues,
             location: location,
             user: user,
-          });
-        } else if (quotationIdParam && entityType === "order_by_quotation") {
-          await saveOrderByQuotationMutation.mutateAsync({
-            salesOrderDetails: quotationDetails,
-            formValues: formValues,
-            location: location,
-            user: user,
-            billToAddress: billToAddress,
-            shipToAddress: shipToAddress,
-            isSameAddress: isSameAddress,
-            deliveryType: deliveryType,
-            selectedTerm: selectedTerm,
-            customDays: customDays,
-            remarks: remarks,
-            quotationId: quotationIdParam,
           });
         } else {
-          await saveOrderMutation.mutateAsync({
+          await saveQuotationMutation.mutateAsync({
             selectedContact: selectedContact,
             user: user,
             selectedCompany: selectedCompany,
@@ -864,7 +696,6 @@ const CreateOrderPage = () => {
             billToAddress: billToAddress,
             shipToAddress: shipToAddress,
             isSameAddress: isSameAddress,
-            deliveryType: deliveryType,
             selectedTerm: selectedTerm,
             customDays: customDays,
             remarks: remarks,
@@ -872,33 +703,16 @@ const CreateOrderPage = () => {
           });
         }
       } else {
-        // For employees, check OTP portal setting
         if (enabledOtpPortal == 0) {
-          // OTP disabled - directly submit order
-          if (orderIdParam) {
-            await saveEditOrderMutation.mutateAsync({
-              salesOrderDetails: salesOrderDetails,
+          if (quotationIdParam) {
+            await saveEditQuotationMutation.mutateAsync({
+              quotationDetails: quotationDetails,
               formValues: formValues,
               location: location,
               user: user,
-            });
-          } else if (quotationIdParam && entityType === "order_by_quotation") {
-            await saveOrderByQuotationMutation.mutateAsync({
-              salesOrderDetails: quotationDetails,
-              formValues: formValues,
-              location: location,
-              user: user,
-              billToAddress: billToAddress,
-              shipToAddress: shipToAddress,
-              isSameAddress: isSameAddress,
-              deliveryType: deliveryType,
-              selectedTerm: selectedTerm,
-              customDays: customDays,
-              remarks: remarks,
-              quotationId: quotationIdParam,
             });
           } else {
-            await saveOrderMutation.mutateAsync({
+            await saveQuotationMutation.mutateAsync({
               selectedContact: selectedContact,
               user: user,
               selectedCompany: selectedCompany,
@@ -911,7 +725,6 @@ const CreateOrderPage = () => {
               billToAddress: billToAddress,
               shipToAddress: shipToAddress,
               isSameAddress: isSameAddress,
-              deliveryType: deliveryType,
               selectedTerm: selectedTerm,
               customDays: customDays,
               remarks: remarks,
@@ -919,7 +732,6 @@ const CreateOrderPage = () => {
             });
           }
         } else {
-          // OTP enabled - generate OTP
           generateOtpMutation.mutate(selectedContact?.mobile);
         }
       }
@@ -951,7 +763,6 @@ const CreateOrderPage = () => {
     await generateOtpMutation.mutateAsync(selectedContact.mobile);
   };
 
-  // Fetch company, branch, and division data using useQuery
   const {
     data: companyData,
     error: companyError,
@@ -964,7 +775,6 @@ const CreateOrderPage = () => {
     cacheTime: 10 * 60 * 1000,
   });
 
-  // Fetch contact data using useQuery
   const {
     data: contactData,
     error: contactError,
@@ -973,21 +783,20 @@ const CreateOrderPage = () => {
     queryKey: [
       "contactList",
       token,
-      entityIdParam ? entityDetails?.company_id : selectedCompany,
+      quotationIdParam ? quotationDetails?.company_id : selectedCompany,
     ],
     queryFn: () =>
       OrderService.getContactRawcontactAutoComplete(
         token,
-        entityIdParam ? entityDetails?.company_id : selectedCompany
+        quotationIdParam ? quotationDetails?.company_id : selectedCompany
       ),
     enabled:
       !!token &&
-      (entityIdParam ? !!entityDetails?.company_id : !!selectedCompany),
+      (quotationIdParam ? !!quotationDetails?.company_id : !!selectedCompany),
     staleTime: 5 * 60 * 1000,
     cacheTime: 10 * 60 * 1000,
   });
 
-  // Fetch product data
   const {
     data: productData,
     error: productError,
@@ -996,22 +805,22 @@ const CreateOrderPage = () => {
     queryKey: [
       "productList",
       token,
-      entityIdParam ? entityDetails?.company_id : selectedCompany,
-      entityIdParam ? entityDetails?.division_id : selectedDivision,
+      quotationIdParam ? quotationDetails?.company_id : selectedCompany,
+      quotationIdParam ? quotationDetails?.division_id : selectedDivision,
       user?.id,
     ],
     queryFn: () =>
       leadService.getProductBasedOnCompany(
         token,
-        entityIdParam ? entityDetails?.company_id : selectedCompany,
-        entityIdParam ? entityDetails?.division_id : selectedDivision,
-        user?.id // Passing employee ID
+        quotationIdParam ? quotationDetails?.company_id : selectedCompany,
+        quotationIdParam ? quotationDetails?.division_id : selectedDivision,
+        user?.id
       ),
     enabled:
       !!token &&
       !!user?.id &&
       (user?.isEmployee
-        ? !!(entityIdParam ? entityDetails?.company_id : selectedCompany)
+        ? !!(quotationIdParam ? quotationDetails?.company_id : selectedCompany)
         : true),
     staleTime: 5 * 60 * 1000,
     cacheTime: 10 * 60 * 1000,
@@ -1019,7 +828,6 @@ const CreateOrderPage = () => {
     refetchOnWindowFocus: false,
   });
 
-  // Fetch company details
   const {
     data: companyDetailsData,
     error: companyDetailsError,
@@ -1032,7 +840,6 @@ const CreateOrderPage = () => {
     cacheTime: 10 * 60 * 1000,
   });
 
-  // Fetch billing address when selectedContact changes or when entityIdParam is present
   const {
     data: billingAddressData,
     error: billingAddressError,
@@ -1040,13 +847,13 @@ const CreateOrderPage = () => {
   } = useQuery({
     queryKey: [
       "contactBillingAddress",
-      entityIdParam
-        ? entityDetails?.contact_id
+      quotationIdParam
+        ? quotationDetails?.contact_id
         : user?.isEmployee
           ? selectedContact?.id
           : user?.id,
-      entityIdParam
-        ? entityDetails?.contact_type
+      quotationIdParam
+        ? quotationDetails?.contact_type
         : user?.isEmployee
           ? selectedContact?.type
           : user?.type,
@@ -1055,21 +862,21 @@ const CreateOrderPage = () => {
     queryFn: () =>
       leadService.getContactBillingAddressForBot(
         token,
-        entityIdParam
-          ? entityDetails.contact_id
+        quotationIdParam
+          ? quotationDetails.contact_id
           : user?.isEmployee
             ? selectedContact.id
             : user.id,
-        entityIdParam
-          ? entityDetails.contact_type
+        quotationIdParam
+          ? quotationDetails.contact_type
           : user?.isEmployee
             ? selectedContact.type
             : user.type
       ),
     enabled:
       !!token &&
-      (entityIdParam
-        ? !!entityDetails?.contact_id && !!entityDetails?.contact_type
+      (quotationIdParam
+        ? !!quotationDetails?.contact_id && !!quotationDetails?.contact_type
         : user?.isEmployee
           ? !!selectedContact?.id && !!selectedContact?.type
           : !!user?.id && !!user?.type),
@@ -1078,7 +885,6 @@ const CreateOrderPage = () => {
     refetchOnMount: "always",
   });
 
-  // Fetch won leads when a contact is selected
   const {
     data: wonLeadResponse,
     error: wonLeadError,
@@ -1097,7 +903,6 @@ const CreateOrderPage = () => {
     refetchOnMount: "always",
   });
 
-  // Handle company, branch, and division data updates
   useEffect(() => {
     if (companyData) {
       const responseData = Array.isArray(companyData)
@@ -1127,7 +932,6 @@ const CreateOrderPage = () => {
     selectedDivision,
   ]);
 
-  // Handle contact data updates
   useEffect(() => {
     if (contactData) {
       const responseData = Array.isArray(contactData)
@@ -1145,7 +949,6 @@ const CreateOrderPage = () => {
     }
   }, [contactData]);
 
-  // Handle product data updates
   useEffect(() => {
     if (productData) {
       const responseData = Array.isArray(productData)
@@ -1163,7 +966,6 @@ const CreateOrderPage = () => {
     }
   }, [productData]);
 
-  // Handle company details data updates
   useEffect(() => {
     if (companyDetailsData) {
       const responseData = Array.isArray(companyDetailsData)
@@ -1180,7 +982,6 @@ const CreateOrderPage = () => {
     }
   }, [companyDetailsData]);
 
-  // Handle billing address response
   useEffect(() => {
     if (billingAddressData) {
       const responseData = Array.isArray(billingAddressData)
@@ -1198,7 +999,6 @@ const CreateOrderPage = () => {
     }
   }, [billingAddressData]);
 
-  // Handle won lead API response
   useEffect(() => {
     if (wonLeadResponse) {
       const responseData = Array.isArray(wonLeadResponse)
@@ -1207,7 +1007,7 @@ const CreateOrderPage = () => {
       if (responseData?.STATUS == "SUCCESS") {
         if (Array.isArray(responseData?.DATA) && responseData.DATA.length > 0) {
           setWonLeadData(responseData.DATA);
-          setShowClickHere(!entityIdParam);
+          setShowClickHere(!quotationIdParam);
         } else {
           setShowClickHere(false);
           setWonLeadData([]);
@@ -1221,7 +1021,6 @@ const CreateOrderPage = () => {
 
   useEffect(() => {
     if (user?.isEmployee && !selectedContact) {
-      setDeliveryType("delivery");
       setBillToAddress(null);
       setShipToAddress(null);
       setIsSameAddress(null);
@@ -1233,7 +1032,6 @@ const CreateOrderPage = () => {
     setSelectedContact(contact);
   };
 
-  // Process matchedContact when contactList updates and pendingContactDetails exists
   useEffect(() => {
     if (pendingContactDetails && contactList.length > 0) {
       const contact_details = pendingContactDetails;
@@ -1254,11 +1052,10 @@ const CreateOrderPage = () => {
       if (matchedContact) {
         contactSelect(matchedContact);
       }
-      setPendingContactDetails(null); // Clear after processing
+      setPendingContactDetails(null);
     }
   }, [contactList, pendingContactDetails]);
 
-  // add contact mutation
   const addContactMutation = useMutation({
     mutationFn: async ({ data, selectedcompany, inputvalue }) => {
       const contactData = {
@@ -1266,7 +1063,7 @@ const CreateOrderPage = () => {
         state: data.state,
         contact_title: data.title,
         name: data.name,
-        company_name: selectedcompany ? selectedcompany.title : inputvalue, // Explicit fallback to ""
+        company_name: selectedcompany ? selectedcompany.title : inputvalue,
         email: data.Email,
         mobile: data.mobile,
         address1: data.address,
@@ -1282,24 +1079,19 @@ const CreateOrderPage = () => {
       return { response };
     },
     onMutate: () => {
-      setIsSaveContact(true); // Disable button before API call
+      setIsSaveContact(true);
     },
     onSuccess: async ({ response }) => {
       const responseData = Array.isArray(response) ? response[0] : response;
-
       if (responseData?.STATUS === "SUCCESS") {
         setContactList([]);
         setIsContactModalOpen(false);
         toast.success("Contact added successfully!", {
           duration: 2000,
         });
-
-        // Store CONTACT_DETAILS for processing after refetch
         if (responseData.CONTACT_DETAILS) {
           setPendingContactDetails(responseData.CONTACT_DETAILS);
         }
-
-        // Invalidate contact list query to trigger refetch
         await queryClient.refetchQueries({
           queryKey: ["contactList", token],
         });
@@ -1315,7 +1107,7 @@ const CreateOrderPage = () => {
       toast.error(errorMessage);
     },
     onSettled: () => {
-      setIsSaveContact(false); // Re-enable button after API call
+      setIsSaveContact(false);
     },
   });
 
@@ -1323,7 +1115,6 @@ const CreateOrderPage = () => {
     addContactMutation.mutate({ data, selectedcompany, inputvalue });
   };
 
-  // add address mutation
   const addAddressMutation = useMutation({
     mutationFn: async (values) => {
       const addressData = {
@@ -1339,7 +1130,7 @@ const CreateOrderPage = () => {
         zipcode: values.zipcode,
       };
 
-      const response = await OrderService.saveContactAddress(addressData);
+      const response = await QuotationService.saveContactAddress(addressData);
       return response;
     },
     onSuccess: async (response) => {
@@ -1352,8 +1143,6 @@ const CreateOrderPage = () => {
         setBillToAddress(null);
         setShipToAddress(null);
         setIsSameAddress(null);
-
-        // Refetch billing address query
         await queryClient.refetchQueries({
           queryKey: [
             "contactBillingAddress",
@@ -1379,20 +1168,14 @@ const CreateOrderPage = () => {
     addAddressMutation.mutate(values);
   };
 
-  // Reset form on mount
-  useEffect(() => {
-    resetForm();
-  }, []);
-
   const resetForm = () => {
-    setDeliveryOption("");
     setRemarks("");
     setSelectedWonLead(null);
     setWonLeadData([]);
     setShowClickHere(false);
     setFormValues(() => {
       const baseFormValues = {
-        unique_id: generateUniqueId(), // Add unique_id
+        unique_id: generateUniqueId(),
         productid: "",
         productname: "",
         productqty: "",
@@ -1408,9 +1191,9 @@ const CreateOrderPage = () => {
         unitvalue: "0",
         proddivision: "",
         stock_data: [],
-        price_list_flg: false, // Added price_list_flg
+        price_list_flg: false,
         Attribute_data: {},
-        attribute: {}, // Added attribute
+        attribute: {},
         scheduleDate: format(new Date(), "yyyy-MM-dd"),
         discount: "",
         discount_amount: "",
@@ -1431,12 +1214,12 @@ const CreateOrderPage = () => {
       if (selectedtypeOption == "lead-option") {
         return [baseFormValues];
       } else if (
-        selectedtypeOption == "salesorder-option" &&
+        (selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") &&
         secUnitConfig == "0"
       ) {
         return [baseFormValues];
       } else if (
-        selectedtypeOption == "salesorder-option" &&
+        (selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") &&
         secUnitConfig == "1"
       ) {
         return [enhancedFormValues];
@@ -1446,8 +1229,11 @@ const CreateOrderPage = () => {
     });
   };
 
-  // Add this at the top of the CreateOrderPage component, before the return statement
-  if ((orderIdParam && !salesOrderDetails) || (quotationIdParam && !quotationDetails)) {
+  useEffect(() => {
+    resetForm();
+  }, []);
+
+  if (quotationIdParam && !quotationDetails) {
     return (
       <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-80 z-10">
         <HashLoader color="#287f71" size={60} speedMultiplier={1.5} />
@@ -1459,7 +1245,7 @@ const CreateOrderPage = () => {
     <div className="space-y-6">
       <h1 className="text-lg font-semibold text-[#4a5a6b] flex items-center gap-2">
         <Columns2 />
-        {orderIdParam ? "Edit" : "Create New"} {ordersLabel}
+        {quotationIdParam ? "Edit" : "Create New"} Quotation
       </h1>
 
       <Card>
@@ -1471,22 +1257,22 @@ const CreateOrderPage = () => {
                   options={companies}
                   value={selectedCompany}
                   onValueChange={setSelectedCompany}
-                  entityIdParam={entityIdParam}
-                  entityDetails={entityDetails}
-                  entityType={entityType}
+                  entityIdParam={quotationIdParam}
+                  entityDetails={quotationDetails}
+                  entityType="quotation"
                 />
                 <BranchSelector
-                  entityIdParam={entityIdParam}
-                  entityDetails={entityDetails}
-                  entityType={entityType}
+                  entityIdParam={quotationIdParam}
+                  entityDetails={quotationDetails}
+                  entityType="quotation"
                 />
                 <DivisionSelector
                   options={divisions}
                   value={selectedDivision}
                   onValueChange={setSelectedDivision}
-                  entityIdParam={entityIdParam}
-                  entityDetails={entityDetails}
-                  entityType={entityType}
+                  entityIdParam={quotationIdParam}
+                  entityDetails={quotationDetails}
+                  entityType="quotation"
                 />
               </>
             </div>
@@ -1509,7 +1295,7 @@ const CreateOrderPage = () => {
                             selectedItem={selectedContact}
                           />
                         </div>
-                        {showAddButton && !contactIdParam && !entityIdParam && (
+                        {showAddButton && !contactIdParam && !quotationIdParam && (
                           <>
                             <Button
                               className="h-9 px-4 ml-0 rounded-l-none bg-[#287f71] hover:bg-[#20665a] text-white"
@@ -1526,7 +1312,7 @@ const CreateOrderPage = () => {
                               <ContactForm
                                 onAddContactSubmit={handleAddContact}
                                 onCancel={() => setIsContactModalOpen(false)}
-                                isSaveContact={isSaveContact} // Pass isSaveContact to ContactForm
+                                isSaveContact={isSaveContact}
                               />
                             </Modal>
                           </>
@@ -1555,9 +1341,9 @@ const CreateOrderPage = () => {
                   customDays={customDays}
                   onChange={handlePaymentTermsChange}
                   selectedContact={selectedContact}
-                  entityIdParam={entityIdParam}
-                  entityDetails={entityDetails}
-                  entityType={entityType}
+                  entityIdParam={quotationIdParam}
+                  entityDetails={quotationDetails}
+                  entityType="quotation"
                 />
               </div>
             </div>
@@ -1573,18 +1359,15 @@ const CreateOrderPage = () => {
                 selectedtypeOption={selectedtypeOption}
                 selectedCompany={selectedCompany}
                 selectedContact={selectedContact}
-                entityIdParam={entityIdParam}
-                entityDetails={entityDetails}
+                entityIdParam={quotationIdParam}
+                entityDetails={quotationDetails}
               />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2">
               <div className="lg:col-span-1">
-                <DeliveryOptions
-                  companyInfo={companyInfo}
+                <QuotationDeliveryOptions
                   deliveryOptions={deliveryOptions}
-                  deliveryType={deliveryType}
-                  setDeliveryType={setDeliveryType}
                   billToAddress={billToAddress}
                   setBillToAddress={setBillToAddress}
                   shipToAddress={shipToAddress}
@@ -1592,11 +1375,11 @@ const CreateOrderPage = () => {
                   isSameAddress={isSameAddress}
                   setIsSameAddress={setIsSameAddress}
                   selectedContact={selectedContact}
-                  entityIdParam={entityIdParam}
-                  entityDetails={entityDetails}
-                  entityType={entityType}
+                  entityIdParam={quotationIdParam}
+                  entityDetails={quotationDetails}
                 />
-                {deliveryType == "delivery" && selectedContact && !entityIdParam && (
+
+                {selectedContact && !quotationIdParam && (
                   <div className="mt-4">
                     <Button
                       className="h-9 px-4 bg-[#287f71] hover:bg-[#20665a] text-white"
@@ -1637,9 +1420,9 @@ const CreateOrderPage = () => {
           <RemarksField
             value={remarks}
             onChange={setRemarks}
-            entityIdParam={entityIdParam}
-            entityDetails={entityDetails}
-            entityType={entityType}
+            entityIdParam={quotationIdParam}
+            entityDetails={quotationDetails}
+            entityType="quotation"
           />
         </CardContent>
       </Card>
@@ -1648,26 +1431,21 @@ const CreateOrderPage = () => {
         type="button"
         className="bg-[#287f71] hover:bg-[#20665a] text-white text-sm sm:text-base px-4 py-2"
         disabled={
-          orderIdParam
+          quotationIdParam
             ? user?.isEmployee && enabledOtpPortal == 0
-              ? saveEditOrderMutation.isPending
+              ? saveEditQuotationMutation.isPending
               : generateOtpMutation.isPending
-            : quotationIdParam && entityType === "order_by_quotation"
-              ? user?.isEmployee && enabledOtpPortal == 0
-                ? saveOrderByQuotationMutation.isPending
+            : user?.isEmployee
+              ? enabledOtpPortal == 0
+                ? saveQuotationMutation.isPending
                 : generateOtpMutation.isPending
-              : user?.isEmployee
-                ? enabledOtpPortal == 0
-                  ? saveOrderMutation.isPending
-                  : generateOtpMutation.isPending
-                : saveOrderMutation.isPending
+              : saveQuotationMutation.isPending
         }
-        onClick={handleCreateOrder}
+        onClick={handleCreateQuotation}
       >
-        {orderIdParam ? "Update" : "Create"} {ordersLabel}
+        {quotationIdParam ? "Update" : "Create"} Quotation
       </Button>
 
-      {/* wonleaddialog  */}
       <WonLeadDialog
         open={isWonLeadModalOpen}
         onOpenChange={setIsWonLeadModalOpen}
@@ -1676,7 +1454,6 @@ const CreateOrderPage = () => {
         setSelectedWonLead={setSelectedWonLead}
       />
 
-      {/* OTP Dialog */}
       <OTPDialog
         open={otpDialogOpen}
         setOpen={setOtpDialogOpen}
@@ -1691,4 +1468,4 @@ const CreateOrderPage = () => {
   );
 };
 
-export default CreateOrderPage;
+export default CreateQuotationPage;

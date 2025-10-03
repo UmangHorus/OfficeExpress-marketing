@@ -25,7 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ChevronDown, ArrowUpDown, MapPin, Eye, Pencil } from "lucide-react";
+import { ChevronDown, ArrowUpDown, MapPin, Eye, Pencil, Download, CheckCircle, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import {
   useReactTable,
@@ -40,9 +40,19 @@ import { Badge } from "@/components/ui/badge";
 import OrderDetailsDialog from "../shared/OrderDetailsDialog";
 import { useRouter } from "next/navigation";
 import OrderService from "@/lib/OrderService";
+import { useSharedDataStore } from "@/stores/sharedData.store";
+import { QuotationService } from "@/lib/QuotationService";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const OrderTable = () => {
-  const { user, token } = useLoginStore();
+  const { user, token, appConfig } = useLoginStore();
   const router = useRouter();
   const orderLabel = useLoginStore(
     (state) => state.navConfig?.labels?.orders || "Order"
@@ -50,6 +60,8 @@ const OrderTable = () => {
   const contactLabel = useLoginStore(
     (state) => state.navConfig?.labels?.contacts || "Contact"
   );
+  const { templateList } =
+    useSharedDataStore();
   const [data, setData] = useState([]);
   const [sorting, setSorting] = useState([]);
   const [columnFilters, setColumnFilters] = useState([]);
@@ -61,7 +73,14 @@ const OrderTable = () => {
   });
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState(""); // State for selected template
+  const [downloading, setDownloading] = useState({}); // Track downloading state per quotation
   const queryClient = useQueryClient();
+
+  // Add these states
+  const [approving, setApproving] = useState({});
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [pendingAction, setPendingAction] = useState({ orderId: null, action: null });
 
   const {
     data: orderData,
@@ -108,6 +127,114 @@ const OrderTable = () => {
 
   const handleCreateOrder = () => {
     router.push("/orders/create");
+  };
+
+  const handleDownloadTemplate = async (orderId) => {
+    if (!selectedTemplate) {
+      toast.error("Please select a template before downloading.");
+      return;
+    }
+
+    setDownloading((prev) => ({ ...prev, [orderId]: true }));
+
+    try {
+      const response = await QuotationService.downloadTemplate(
+        token,
+        orderId,
+        "21", // Changed from 17 to 21 for orders
+        selectedTemplate
+      );
+
+      if (response?.STATUS !== "SUCCESS") {
+        throw new Error(response?.MSG || "Failed to fetch template download path");
+      }
+
+      const { transaction_id, path } = response?.DATA || {};
+      if (!path) {
+        throw new Error("No download path provided in response");
+      }
+
+      // Get the selected template name
+      const template = templateList?.data?.["21"]?.find(
+        (t) => t.id == selectedTemplate
+      );
+      const templateName = template?.name || "template";
+      // Get the full order number
+      const order = data.find((o) => o.id == orderId);
+      const fullOrderNo = order?.fullorder_no || transaction_id;
+      // Get the file extension from the path
+      const fileExtension = path.split(".").pop() || "pdf";
+
+      // Fetch the file as a blob
+      const fileResponse = await fetch(path);
+      if (!fileResponse.ok) {
+        throw new Error("Failed to fetch the file");
+      }
+      const blob = await fileResponse.blob();
+
+      // Create a URL for the blob and trigger download with dynamic filename
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${templateName}_${fullOrderNo}.${fileExtension}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error downloading template:", error.message, error.response?.data);
+      toast.error(error.message || "Failed to download template");
+    } finally {
+      setDownloading((prev) => ({ ...prev, [orderId]: false }));
+    }
+  };
+
+  // Handle approve/reject action
+  const handleApproveReject = (orderId, action) => {
+    setPendingAction({ orderId, action });
+    setShowConfirmDialog(true);
+  };
+
+  // Confirm and execute the action
+  const handleConfirmAction = async () => {
+    const { orderId, action } = pendingAction;
+
+    if (!orderId) {
+      toast.error("No order selected for action");
+      setShowConfirmDialog(false);
+      return;
+    }
+
+    setApproving(prev => ({ ...prev, [orderId]: true }));
+
+    try {
+      // Determine status flag based on action
+      const statusFlag = action == "approve" ? "A" : "R";
+
+      const response = await OrderService.approveRejectOrder(
+        token,
+        orderId,
+        statusFlag
+      );
+
+      // Check if response is an array and get the first element
+      const responseData = Array.isArray(response) ? response[0] : response;
+
+      if (responseData?.STATUS == "SUCCESS") {
+        toast.success(`Order ${action == "approve" ? "approved" : "rejected"} successfully`);
+        // Refetch orders to update the list
+        refetchOrders();
+      } else {
+        throw new Error(responseData?.MSG || `Failed to ${action} order`);
+      }
+    } catch (error) {
+      console.error(`Error ${action}ing order:`, error);
+      toast.error(error.message || `Failed to ${action} order`);
+    } finally {
+      setApproving(prev => ({ ...prev, [orderId]: false }));
+      setShowConfirmDialog(false);
+      setPendingAction({ orderId: null, action: null });
+    }
   };
 
   const columns = useMemo(
@@ -198,7 +325,7 @@ const OrderTable = () => {
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
             className="text-left w-full justify-start text-white hover:text-white hover:bg-[#4a5a6b]"
           >
-            Order Number
+            {`${orderLabel} Number`}
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         ),
@@ -232,7 +359,7 @@ const OrderTable = () => {
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
             className="text-left w-full justify-start text-white hover:text-white hover:bg-[#4a5a6b]"
           >
-            Customer Name
+            {`${contactLabel} Name`}
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         ),
@@ -347,13 +474,65 @@ const OrderTable = () => {
                   router.push(`/orders/create?orderId=${order.id}`);
                 }}
               />
+              {/* Download Template Button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleDownloadTemplate(order.id)}
+                disabled={downloading[order.id]}
+                className="p-0 h-auto"
+              >
+                {downloading[order.id] ? (
+                  <span className="animate-spin inline-block h-5 w-5 border-2 border-t-transparent border-[#287F71] rounded-full"></span>
+                ) : (
+                  <Download className="text-[#287F71] hover:text-[#1a5c4d] cursor-pointer" />
+                )}
+              </Button>
+            </div>
+          );
+        },
+        enableHiding: false,
+      },
+      // New Approve/Reject Column
+      {
+        id: "approveReject",
+        header: () => <div className="text-center text-white">Approve/Reject</div>,
+        cell: ({ row }) => {
+          const order = row.original;
+          const status = order.status_flg;
+
+          // Check if should show approve/reject icons
+          const shouldShowIcons =
+            appConfig?.user_role?.so?.canApproveSO == 1 &&
+            user?.isEmployee &&
+            status != "A" &&
+            status != "C";
+
+          if (!shouldShowIcons) {
+            return <div className="text-center">-</div>;
+          }
+
+          return (
+            <div className="text-center flex justify-center gap-2">
+              {/* Approve Icon */}
+              <CheckCircle
+                className="h-5 w-5 text-[#287F71] hover:text-[#1a5c4d] cursor-pointer"
+                onClick={() => handleApproveReject(order.id, "approve")}
+                title="Approve Order"
+              />
+              {/* Reject Icon */}
+              <XCircle
+                className="h-5 w-5 text-[#ec344c] hover:text-[#d11a32] cursor-pointer"
+                onClick={() => handleApproveReject(order.id, "reject")}
+                title="Reject Order"
+              />
             </div>
           );
         },
         enableHiding: false,
       },
     ],
-    []
+    [selectedTemplate, downloading, setSelectedOrderId, setDialogOpen, router, orderLabel, contactLabel, handleDownloadTemplate]
   );
 
   const table = useReactTable({
@@ -431,7 +610,7 @@ const OrderTable = () => {
       "Created Address",
       "Order Number",
       "Create Date", // Will show as "27/06/2025 03:25 pm"
-      "Customer Name",
+      `${contactLabel} Name`,
       "Created By",
       "Status", // Will show human-readable status
       "Source", // Will show human-readable source
@@ -512,6 +691,23 @@ const OrderTable = () => {
             onChange={(event) => setGlobalFilter(event.target.value)}
             className="w-full sm:max-w-sm bg-[#fff]"
           />
+
+          <Select
+            value={selectedTemplate}
+            onValueChange={setSelectedTemplate}
+            disabled={templateList?.isLoading || !templateList?.data?.["17"]?.length}
+          >
+            <SelectTrigger className="w-full sm:max-w-[200px] bg-white">
+              <SelectValue placeholder={templateList?.isLoading ? "Loading templates..." : "Select Printing Template"} />
+            </SelectTrigger>
+            <SelectContent>
+              {templateList?.data?.["21"]?.map((template) => (
+                <SelectItem key={template.id} value={template.id}>
+                  {template.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Action Buttons Section */}
@@ -702,6 +898,47 @@ const OrderTable = () => {
           onOpenChange={setDialogOpen}
         />
       )}
+
+      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <DialogContent className="w-[90vw] max-w-[425px] max-h-[90vh] overflow-y-auto bg-white p-4 sm:p-6 rounded-lg">
+          <DialogHeader>
+            <DialogTitle>
+              Confirm {pendingAction.action === "approve" ? "Approve" : "Reject"}
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to {pendingAction.action} this order?
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="sm:justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowConfirmDialog(false)}
+              disabled={approving[pendingAction.orderId]}
+            >
+              Cancel
+            </Button>
+            <Button
+              className={
+                pendingAction.action === "approve"
+                  ? "bg-[#287F71] hover:bg-[#1a5c4d] text-white"
+                  : "bg-[#ec344c] hover:bg-[#d11a32] text-white"
+              }
+              onClick={handleConfirmAction}
+              disabled={approving[pendingAction.orderId]}
+            >
+              {approving[pendingAction.orderId] ? (
+                <>
+                  <span className="animate-spin inline-block h-4 w-4 border-2 border-t-transparent border-white rounded-full mr-2"></span>
+                  {pendingAction.action === "approve" ? "Approving..." : "Rejecting..."}
+                </>
+              ) : (
+                `Yes, ${pendingAction.action === "approve" ? "Approve" : "Reject"}`
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

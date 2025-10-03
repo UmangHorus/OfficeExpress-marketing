@@ -40,6 +40,7 @@ import {
   ShoppingCart,
   Pencil,
   Ruler,
+  FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -63,17 +64,22 @@ import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
 import { Label } from "@radix-ui/react-label";
 import { Modal } from "../shared/Modal";
 import useLocationPermission from "@/hooks/useLocationPermission";
+import useBasicSettingsStore from "@/stores/basicSettings.store";
 
 const ContactList = () => {
   const { user, token, location, appConfig } = useLoginStore();
   const contactLabel = useLoginStore(
     (state) => state.navConfig?.labels?.contacts || "Contact"
   );
+  const add_measurement_config = false || appConfig?.add_measurement;
+
   const { setLeadContact } = useLeadContactStore();
   const { companyBranchDivisionData, setCompanyBranchDivisionData, routeList } =
     useSharedDataStore();
   const checkAndRequestLocation = useLocationPermission();
+  const { titles } = useBasicSettingsStore();
 
+  const [selectedContactType, setSelectedContactType] = useState("both");
   const [data, setData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [visitorFound, setVisitorFound] = useState([]);
@@ -164,12 +170,12 @@ const ContactList = () => {
               visitStatus: isVisitorOut ? "out" : null,
               contact_type: item.contact_type || "",
               contact_title: item.contact_title || "",
+              handled_by: item.handled_by || "",
               ev_id: item.ev_id || null,
             };
           }) || [];
         setVisitorFound(responseData?.visitor_found || []);
         setData(contactList);
-        setFilteredData(contactList);
       } else {
         console.error(responseData?.MSG || "Failed to fetch contact list");
         toast.error(responseData?.MSG || "Failed to fetch contact list");
@@ -210,19 +216,58 @@ const ContactList = () => {
   //   }
   // }, [routeData, routeError]);
 
-  useEffect(() => {
-    const value = selectedRoute === "all" ? "" : selectedRoute;
-    if (value) {
-      const filtered = data.filter((item) =>
-        item.route_values.some(
-          (route) => route.RouteMaster.route_id == selectedRoute
+  // useEffect(() => {
+  //   const value = selectedRoute === "all" ? "" : selectedRoute;
+  //   if (value) {
+  //     const filtered = data.filter((item) =>
+  //       item.route_values.some(
+  //         (route) => route.RouteMaster.route_id == selectedRoute
+  //       )
+  //     );
+  //     setFilteredData(filtered);
+  //   } else {
+  //     setFilteredData(data);
+  //   }
+  // }, [data, selectedRoute]);
+
+  // This useEffect will handle filtering automatically when data changes
+
+  // Combined filter function with safety checks
+  const applyFilters = (dataToFilter, contactType, route) => {
+    // Safety check for data
+    if (!dataToFilter || !Array.isArray(dataToFilter)) {
+      setFilteredData([]);
+      return;
+    }
+
+    let filtered = dataToFilter;
+
+
+    // Apply contact type filter
+    if (contactType == "company") {
+      filtered = filtered.filter((contact) => contact.contact_title == "1");
+    } else if (contactType == "individual") {
+      filtered = filtered.filter((contact) => contact.contact_title != "1");
+    }
+
+    // Apply route filter
+    const routeValue = route == "all" ? "" : route;
+    if (routeValue) {
+      filtered = filtered.filter((item) =>
+        item.route_values?.some(
+          (routeItem) => routeItem?.RouteMaster?.route_id == routeValue
         )
       );
-      setFilteredData(filtered);
-    } else {
-      setFilteredData(data);
     }
-  }, [data, selectedRoute]);
+
+    setFilteredData(filtered);
+  };
+
+  useEffect(() => {
+    if (data.length > 0) {
+      applyFilters(data, selectedContactType, selectedRoute);
+    }
+  }, [data, selectedRoute, selectedContactType]);
 
   const {
     data: companyData,
@@ -405,70 +450,11 @@ const ContactList = () => {
     });
   };
 
-  // const handleExportCSV = () => {
-  //   try {
-  //     const rows = globalFilter
-  //       ? table.getRowModel().rows.map((row) => row.original)
-  //       : filteredData;
-  //     if (!rows || rows.length === 0) {
-  //       toast.error("No data available to export");
-  //       return;
-  //     }
-  //     const headers = [
-  //       "ID",
-  //       "Name",
-  //       "Mobile",
-  //       "Email",
-  //       "Industry",
-  //       "Area",
-  //       "City",
-  //       "Route",
-  //       "State",
-  //       "Country",
-  //       "Location",
-  //       "Contact Type",
-  //     ];
-  //     const csvContent = [
-  //       headers.join(","),
-  //       ...rows.map((row) =>
-  //         [
-  //           row.id || "",
-  //           `"${row.name || ""}"`,
-  //           row.mobile || "",
-  //           `"${row.email || ""}"`,
-  //           row.industry || "",
-  //           row.area || "",
-  //           row.city || "",
-  //           row.route || "",
-  //           row.state || "",
-  //           row.country || "",
-  //           `"${row.location || ""}"`,
-  //           row.contact_type || "",
-  //         ].join(",")
-  //       ),
-  //     ].join("\n");
-  //     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  //     const link = document.createElement("a");
-  //     const url = URL.createObjectURL(blob);
-  //     link.href = url;
-  //     link.download = `${contactLabel}_${format(new Date(), "yyyy-MM-dd")}.csv`;
-  //     document.body.appendChild(link);
-  //     link.click();
-  //     setTimeout(() => {
-  //       document.body.removeChild(link);
-  //       URL.revokeObjectURL(url);
-  //     }, 100);
-  //   } catch (error) {
-  //     console.error("Export failed:", error);
-  //     toast.error("Failed to export data. Please try again.");
-  //   }
-  // };
-
   const handleExportCSV = () => {
-    // Excel-compatible CSV format with BOM for UTF-8
     const BOM = "\uFEFF";
     const headers = [
       "Location",
+      "Title",
       "Name",
       "Mobile",
       "Email",
@@ -479,6 +465,7 @@ const ContactList = () => {
       "Country",
       "Postal Code",
       "Routes",
+      "Key Account Manager",
     ];
 
     const csvData = filteredData.map((contact) => {
@@ -486,15 +473,14 @@ const ContactList = () => {
         if (!str) return "";
         return `"${String(str).replace(/"/g, '""')}"`;
       };
-
-      // Append contact type to name if it exists
+      const title = titles.find((t) => t.ID == contact.contact_title)?.Name || contact.contact_title || "";
       const formattedName = contact.contact_type
         ? `${contact.name} (${contact.contact_type})`
         : contact.name;
-
       return [
         escapeCsv(contact.location),
-        escapeCsv(formattedName), // Now includes contact type in parentheses
+        escapeCsv(title),
+        escapeCsv(formattedName),
         contact.mobile,
         contact.email,
         escapeCsv(contact.industry),
@@ -504,14 +490,14 @@ const ContactList = () => {
         escapeCsv(contact.country),
         contact.zipcode,
         escapeCsv(contact.route?.join(", ")),
+        escapeCsv(contact.handled_by),
       ];
     });
 
     const csvContent =
       BOM +
-      [headers.join(","), ...csvData.map((row) => row.join(","))].join("\r\n"); // \r\n for Excel compatibility
+      [headers.join(","), ...csvData.map((row) => row.join(","))].join("\r\n");
 
-    // Download with current date in filename
     const dateStr = new Date().toISOString().slice(0, 10);
     downloadFile(csvContent, `${contactLabel}_export_${dateStr}.csv`);
   };
@@ -541,6 +527,16 @@ const ContactList = () => {
     router.push(`/leads/create?${queryParams.toString()}`); // 👈 Replaces URL
   };
 
+  const handleAddQuotation = (id, type) => {
+    setLeadContact(id, type, visitorFound[0]);
+    const queryParams = new URLSearchParams({
+      contact_id: id,
+      contact_type: type,
+      ev_id: visitorFound[0]?.ev_id || "",
+    });
+    router.push(`/quotations/create?${queryParams.toString()}`);
+  };
+
   const handleAddOrder = (id, type) => {
     setLeadContact(id, type, visitorFound[0]);
     const queryParams = new URLSearchParams({
@@ -557,7 +553,7 @@ const ContactList = () => {
       contact_type: type,
       ev_id: visitorFound[0]?.ev_id || "",
     });
-    router.push(`/measurements/add?${queryParams.toString()}`);  // 👈 Replaces URL
+    router.push(`/measurements/add?${queryParams.toString()}`); // 👈 Replaces URL
   };
 
   const handleVisitIn = async (id, contactType) => {
@@ -632,6 +628,9 @@ const ContactList = () => {
       case "lead":
         handleAddLead(id, contactType);
         break;
+      case "quotation":
+        handleAddQuotation(id, contactType);
+        break;
       case "order":
         handleAddOrder(id, contactType);
         break;
@@ -681,9 +680,12 @@ const ContactList = () => {
         const visitorResult = visitorResponse[0] || {};
         if (visitorResult.STATUS === "SUCCESS") {
           await refetchContacts();
-          toast.success("Follow-up added and Visit Out recorded successfully.", {
-            duration: 2000,
-          });
+          toast.success(
+            "Follow-up added and Visit Out recorded successfully.",
+            {
+              duration: 2000,
+            }
+          );
           setIsFollowupDialogOpen(false);
           setSelectedContact(null);
         } else {
@@ -706,267 +708,302 @@ const ContactList = () => {
   };
 
   const columns = useMemo(
-    () => [
-      {
-        id: "visit",
-        header: "Visit",
-        cell: ({ row }) => {
-          const lead = row.original || {};
-          const contactTypeMap = {
-            C: "1",
-            RC: "6",
-          };
-          const mappedContactType = contactTypeMap[lead.contact_type] || "";
-          const isVisitorMismatch =
-            visitorFound.length > 0 &&
-            (lead.id != visitorFound[0]?.reference_id ||
-              mappedContactType != visitorFound[0]?.reference_type);
-          if (lead.visitStatus === "out") {
+    () => {
+
+      return [
+        {
+          id: "visit",
+          header: "Visit",
+          cell: ({ row }) => {
+            const lead = row.original || {};
+            const contactTypeMap = {
+              C: "1",
+              RC: "6",
+            };
+            const mappedContactType = contactTypeMap[lead.contact_type] || "";
+            const isVisitorMismatch =
+              visitorFound.length > 0 &&
+              (lead.id != visitorFound[0]?.reference_id ||
+                mappedContactType != visitorFound[0]?.reference_type);
+            if (lead.visitStatus === "out") {
+              return (
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="bg-orange-600 hover:bg-orange-700 w-full px-1"
+                  onClick={() =>
+                    handleVisitOut(lead.id, lead.contact_type, lead.name)
+                  }
+                  disabled={disabledVisitOut || isVisitorMismatch}
+                >
+                  Visit Out
+                </Button>
+              );
+            }
             return (
               <Button
                 variant="default"
                 size="sm"
-                className="bg-orange-600 hover:bg-orange-700 w-full px-1"
-                onClick={() =>
-                  handleVisitOut(lead.id, lead.contact_type, lead.name)
-                }
-                disabled={disabledVisitOut || isVisitorMismatch}
+                className={`mx-auto text-white w-full px-1 ${lead.ev_id
+                  ? "bg-[#4a5a6b] hover:bg-[#5c6b7a]"
+                  : "bg-[#287f71] hover:bg-[#20665a]"
+                  }`}
+                onClick={() => handleVisitIn(lead.id, lead.contact_type)}
+                disabled={disabledVisitIn || isVisitorMismatch}
               >
-                Visit Out
+                Visit In
               </Button>
             );
-          }
-          return (
-            <Button
-              variant="default"
-              size="sm"
-              className={`mx-auto text-white w-full px-1 ${lead.ev_id
-                ? "bg-[#4a5a6b] hover:bg-[#5c6b7a]"
-                : "bg-[#287f71] hover:bg-[#20665a]"
-                }`}
-              onClick={() => handleVisitIn(lead.id, lead.contact_type)}
-              disabled={disabledVisitIn || isVisitorMismatch}
-            >
-              Visit In
-            </Button>
-          );
+          },
+          enableHiding: false,
         },
-        enableHiding: false,
-      },
-      {
-        accessorKey: "location",
-        header: "Location",
-        cell: ({ row }) => {
-          const location = row.getValue("location") || "";
-          const isLocationDisabled = !location || location.trim() === "";
-          return (
-            <div className="flex items-center justify-center">
-              {isLocationDisabled ? (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={true}
-                  title="No location available"
-                  className="cursor-not-allowed "
-                >
-                  <MapPin className="h-4 w-4 text-gray-400" />
-                </Button>
-              ) : (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  asChild
-                  title={`Contact Address: ${location}`}
-                >
-                  <a
-                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                      location
-                    )}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[#287f71] hover:text-[#1a5c4d] "
+        {
+          accessorKey: "location",
+          header: "Location",
+          cell: ({ row }) => {
+            const location = row.getValue("location") || "";
+            const isLocationDisabled = !location || location.trim() === "";
+            return (
+              <div className="flex items-center justify-center">
+                {isLocationDisabled ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={true}
+                    title="No location available"
+                    className="cursor-not-allowed "
                   >
-                    <MapPin className="h-4 w-4" />
-                  </a>
-                </Button>
+                    <MapPin className="h-4 w-4 text-gray-400" />
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    asChild
+                    title={`Contact Address: ${location}`}
+                  >
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                        location
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#287f71] hover:text-[#1a5c4d] "
+                    >
+                      <MapPin className="h-4 w-4" />
+                    </a>
+                  </Button>
+                )}
+              </div>
+            );
+          },
+        },
+        {
+          id: "edit",
+          header: () => <div className="text-center text-white">Edit</div>,
+          cell: ({ row }) => {
+            const contact = row.original;
+            return (
+              <div className="text-center flex justify-center gap-2">
+                <Pencil
+                  className="h-5 w-5 text-[#D97706] hover:text-[#B45309] cursor-pointer"
+                  onClick={() => {
+                    setEditContact(contact);
+                    setIsContactDialogOpen(true);
+                  }}
+                />
+              </div>
+            );
+          },
+          enableHiding: false,
+        },
+        {
+          accessorKey: "id",
+          header: ({ column }) => (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="text-left w-full justify-start text-white hover:text-white hover:bg-[#4a5a6b]"
+            >
+              ID
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          ),
+          cell: ({ row }) => <div>{row.getValue("id") || ""}</div>,
+        },
+        {
+          accessorKey: "contact_title",
+          header: ({ column }) => (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="text-left w-full justify-start text-white hover:text-white hover:bg-[#4a5a6b]"
+            >
+              Title
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          ),
+          cell: ({ row }) => {
+            const titleId = row.getValue("contact_title");
+            const title = titles.find((t) => t.ID == titleId)?.Name || titleId || "";
+            return <div>{title}</div>;
+          },
+        },
+        {
+          accessorKey: "name",
+          header: ({ column }) => (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="text-left w-full justify-start text-white hover:text-white hover:bg-[#4a5a6b]"
+            >
+              Name
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          ),
+          cell: ({ row }) => (
+            <div>
+              {row.getValue("name") || ""}
+              {row.original.contact_type && (
+                <span className="ml-1">({row.original.contact_type})</span>
               )}
             </div>
-          );
+          ),
         },
-      },
-      {
-        id: "edit",
-        header: () => <div className="text-center text-white">Edit</div>,
-        cell: ({ row }) => {
-          const contact = row.original;
-          return (
-            <div className="text-center flex justify-center gap-2">
-              <Pencil
-                className="h-5 w-5 text-[#D97706] hover:text-[#B45309] cursor-pointer"
-                onClick={() => {
-                  setEditContact(contact);
-                  setIsContactDialogOpen(true);
-                }}
-              />
-            </div>
-          );
+        {
+          accessorKey: "mobile",
+          header: ({ column }) => (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="text-left w-full justify-start text-white hover:text-white hover:bg-[#4a5a6b]"
+            >
+              Mobile
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          ),
+          cell: ({ row }) => <div>{row.getValue("mobile") || ""}</div>,
         },
-        enableHiding: false,
-      },
-      {
-        accessorKey: "id",
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="text-left w-full justify-start text-white hover:text-white hover:bg-[#4a5a6b]"
-          >
-            ID
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        ),
-        cell: ({ row }) => <div>{row.getValue("id") || ""}</div>,
-      },
-      {
-        accessorKey: "name",
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="text-left w-full justify-start text-white hover:text-white hover:bg-[#4a5a6b]"
-          >
-            Name
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        ),
-        cell: ({ row }) => (
-          <div>
-            {row.getValue("name") || ""}
-            {row.original.contact_type && (
-              <span className="ml-1">({row.original.contact_type})</span>
-            )}
-          </div>
-        ),
-      },
-      {
-        accessorKey: "mobile",
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="text-left w-full justify-start text-white hover:text-white hover:bg-[#4a5a6b]"
-          >
-            Mobile
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        ),
-        cell: ({ row }) => <div>{row.getValue("mobile") || ""}</div>,
-      },
-      {
-        accessorKey: "email",
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="text-left w-full justify-start text-white hover:text-white hover:bg-[#4a5a6b]"
-          >
-            Email
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        ),
-        cell: ({ row }) => <div>{row.getValue("email") || ""}</div>,
-      },
-      {
-        accessorKey: "industry",
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="text-left w-full justify-start text-white hover:text-white hover:bg-[#4a5a6b]"
-          >
-            Industry
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        ),
-        cell: ({ row }) => <div>{row.getValue("industry") || ""}</div>,
-      },
-      {
-        accessorKey: "area",
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="text-left w-full justify-start text-white hover:text-white hover:bg-[#4a5a6b]"
-          >
-            Area
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        ),
-        cell: ({ row }) => <div>{row.getValue("area") || ""}</div>,
-      },
-      {
-        accessorKey: "city",
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="text-left w-full justify-start text-white hover:text-white hover:bg-[#4a5a6b]"
-          >
-            City
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        ),
-        cell: ({ row }) => <div>{row.getValue("city") || ""}</div>,
-      },
-      {
-        accessorKey: "route",
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="text-left w-full justify-start text-white hover:text-white hover:bg-[#4a5a6b]"
-          >
-            Route
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        ),
-        cell: ({ row }) => {
-          const routes = row.getValue("route") || [];
-          if (routes.length === 0) {
-            return <div>-</div>;
-          }
-          return <div>{routes.join(" / ")}</div>;
+        {
+          accessorKey: "email",
+          header: ({ column }) => (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="text-left w-full justify-start text-white hover:text-white hover:bg-[#4a5a6b]"
+            >
+              Email
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          ),
+          cell: ({ row }) => <div>{row.getValue("email") || ""}</div>,
         },
-      },
-      {
-        accessorKey: "state",
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="text-left w-full justify-start text-white hover:text-white hover:bg-[#4a5a6b]"
-          >
-            State
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        ),
-        cell: ({ row }) => <div>{row.getValue("state") || ""}</div>,
-      },
-      {
-        accessorKey: "country",
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="text-left w-full justify-start text-white hover:text-white hover:bg-[#4a5a6b]"
-          >
-            Country
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        ),
-        cell: ({ row }) => <div>{row.getValue("country") || ""}</div>,
-      },
-    ],
+        {
+          accessorKey: "industry",
+          header: ({ column }) => (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="text-left w-full justify-start text-white hover:text-white hover:bg-[#4a5a6b]"
+            >
+              Industry
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          ),
+          cell: ({ row }) => <div>{row.getValue("industry") || ""}</div>,
+        },
+        {
+          accessorKey: "area",
+          header: ({ column }) => (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="text-left w-full justify-start text-white hover:text-white hover:bg-[#4a5a6b]"
+            >
+              Area
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          ),
+          cell: ({ row }) => <div>{row.getValue("area") || ""}</div>,
+        },
+        {
+          accessorKey: "city",
+          header: ({ column }) => (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="text-left w-full justify-start text-white hover:text-white hover:bg-[#4a5a6b]"
+            >
+              City
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          ),
+          cell: ({ row }) => <div>{row.getValue("city") || ""}</div>,
+        },
+        {
+          accessorKey: "route",
+          header: ({ column }) => (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="text-left w-full justify-start text-white hover:text-white hover:bg-[#4a5a6b]"
+            >
+              Route
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          ),
+          cell: ({ row }) => {
+            const routes = row.getValue("route") || [];
+            if (routes.length === 0) {
+              return <div>-</div>;
+            }
+            return <div>{routes.join(" / ")}</div>;
+          },
+        },
+        {
+          accessorKey: "state",
+          header: ({ column }) => (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="text-left w-full justify-start text-white hover:text-white hover:bg-[#4a5a6b]"
+            >
+              State
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          ),
+          cell: ({ row }) => <div>{row.getValue("state") || ""}</div>,
+        },
+        {
+          accessorKey: "country",
+          header: ({ column }) => (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="text-left w-full justify-start text-white hover:text-white hover:bg-[#4a5a6b]"
+            >
+              Country
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          ),
+          cell: ({ row }) => <div>{row.getValue("country") || ""}</div>,
+        },
+        {
+          accessorKey: "handled_by",
+          header: ({ column }) => (
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              className="text-left w-full justify-start text-white hover:text-white hover:bg-[#4a5a6b]"
+            >
+              Key Account Manager
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          ),
+          cell: ({ row }) => <div>{row.getValue("handled_by") || ""}</div>,
+        },
+      ];
+    },
     [
       handleVisitIn,
       handleVisitOut,
@@ -1003,9 +1040,14 @@ const ContactList = () => {
         "state",
         "country",
         "location",
+        "contact_title",
+        "handled_by",
       ];
       return fields.some((field) => {
-        const value = row.getValue(field);
+        let value = row.getValue(field);
+        if (field == "contact_title") {
+          value = titles.find((t) => t.ID == value)?.Name || value || "";
+        }
         return value ? String(value).toLowerCase().includes(search) : false;
       });
     },
@@ -1040,9 +1082,10 @@ const ContactList = () => {
             {visitorFound[0].reference_name ? (
               <>
                 Visit status: <span className="">Pending check-out</span> for{" "}
-                <span className="underline">{visitorFound[0].reference_name}</span>
-                {" "}(
-                {visitorFound[0].reference_type == "1" ? "C" : "RC"})
+                <span className="underline">
+                  {visitorFound[0].reference_name}
+                </span>{" "}
+                ({visitorFound[0].reference_type == "1" ? "C" : "RC"})
                 {visitorFound[0].reference_mobile_no && (
                   <>, Mobile: {visitorFound[0].reference_mobile_no}</>
                 )}
@@ -1053,8 +1096,7 @@ const ContactList = () => {
                 <span className="underline">
                   Reference ID: {visitorFound[0].reference_id}
                 </span>
-                (Type:{" "}
-                {visitorFound[0].reference_type == "1" ? "C" : "RC"})
+                (Type: {visitorFound[0].reference_type == "1" ? "C" : "RC"})
               </>
             )}
           </p>
@@ -1069,12 +1111,10 @@ const ContactList = () => {
             onChange={(event) => setGlobalFilter(event.target.value)}
             className="w-full sm:max-w-sm bg-[#fff]"
           />
-
           {routeList.length > 0 && (
             <Select
               value={selectedRoute}
               onValueChange={setSelectedRoute}
-            // disabled={routeLoading || routeError}
             >
               <SelectTrigger className="w-full sm:w-[200px] bg-[#fff]">
                 <SelectValue placeholder="Select Route" />
@@ -1089,6 +1129,20 @@ const ContactList = () => {
               </SelectContent>
             </Select>
           )}
+          <Select
+            value={selectedContactType}
+            onValueChange={setSelectedContactType} // Just set the state, let useEffect handle filtering
+
+          >
+            <SelectTrigger className="w-full sm:w-[200px] bg-[#fff] sm:ml-2">
+              <SelectValue placeholder="Select Contact Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="both">Both</SelectItem>
+              <SelectItem value="company">Company Contact</SelectItem>
+              <SelectItem value="individual">Individual Contact</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Action Buttons - Two lines on mobile */}
@@ -1343,6 +1397,29 @@ const ContactList = () => {
                 </Label>
               </div>
 
+              {/* New Quotation Option */}
+              <div className="flex items-center space-x-3">
+                <RadioGroupItem
+                  value="quotation"
+                  id="quotation"
+                  className="text-white data-[state=checked]:border-[#287f71] [&[data-state=checked]>span>svg]:fill-[#287f71] h-5 w-5"
+                />
+                <Label
+                  htmlFor="quotation"
+                  className="flex items-center gap-2 font-normal cursor-pointer"
+                >
+                  <div className="p-2 rounded-lg bg-[#287f71]/10 text-[#287f71]">
+                    <FileText className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="font-medium">Create Quotation</p>
+                    <p className="text-sm text-muted-foreground">
+                      Generate a price quotation
+                    </p>
+                  </div>
+                </Label>
+              </div>
+
               <div className="flex items-center space-x-3">
                 <RadioGroupItem
                   value="order"
@@ -1365,27 +1442,29 @@ const ContactList = () => {
                 </Label>
               </div>
 
-              {/* <div className="flex items-center space-x-3">
-                <RadioGroupItem
-                  value="measurement"
-                  id="measurement"
-                  className="text-white data-[state=checked]:border-[#287f71] [&[data-state=checked]>span>svg]:fill-[#287f71] h-5 w-5"
-                />
-                <Label
-                  htmlFor="measurement"
-                  className="flex items-center gap-2 font-normal cursor-pointer"
-                >
-                  <div className="p-2 rounded-lg bg-[#287f71]/10 text-[#287f71]">
-                    <Ruler className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <p className="font-medium">Add Measurement</p>
-                    <p className="text-sm text-muted-foreground">
-                      Record a new measurement
-                    </p>
-                  </div>
-                </Label>
-              </div> */}
+              {add_measurement_config && (
+                <div className="flex items-center space-x-3">
+                  <RadioGroupItem
+                    value="measurement"
+                    id="measurement"
+                    className="text-white data-[state=checked]:border-[#287f71] [&[data-state=checked]>span>svg]:fill-[#287f71] h-5 w-5"
+                  />
+                  <Label
+                    htmlFor="measurement"
+                    className="flex items-center gap-2 font-normal cursor-pointer"
+                  >
+                    <div className="p-2 rounded-lg bg-[#287f71]/10 text-[#287f71]">
+                      <Ruler className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="font-medium">Add Measurement</p>
+                      <p className="text-sm text-muted-foreground">
+                        Record a new measurement
+                      </p>
+                    </div>
+                  </Label>
+                </div>
+              )}
             </RadioGroup>
           </div>
           <DialogFooter className="flex justify-end gap-4 flex-row">
@@ -1434,8 +1513,6 @@ const ContactList = () => {
           isSaveContact={isSaveContact} // Pass isSaveContact to ContactForm
         />
       </Modal>
-
-
     </div>
   );
 };

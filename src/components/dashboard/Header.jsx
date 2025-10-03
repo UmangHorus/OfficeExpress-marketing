@@ -44,7 +44,6 @@ export default function DashboardHeader({ toggleSidebar, sidebarVisible }) {
   const [punchOutBtn, setPunchOutBtn] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const dropdownTriggerRef = useRef(null);
-  const baseurl = process.env.NEXT_PUBLIC_API_BASE_URL_FALLBACK;
 
   const { user = {}, appConfig = {}, token, logout } = useLoginStore();
   const { attrId, punchOut, employeePunchoutReset, resetAttendance } = usePunchStore();
@@ -94,9 +93,8 @@ export default function DashboardHeader({ toggleSidebar, sidebarVisible }) {
       logout();
       const cookiesToClear = ["token", "isEmployee"];
       cookiesToClear.forEach((cookieName) => {
-        document.cookie = `${cookieName}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax${
-          process.env.NODE_ENV === "production" ? "; Secure" : ""
-        }`;
+        document.cookie = `${cookieName}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax${process.env.NODE_ENV === "production" ? "; Secure" : ""
+          }`;
       });
       if (typeof window !== "undefined") {
         localStorage.removeItem("auth-storage");
@@ -226,7 +224,7 @@ export default function DashboardHeader({ toggleSidebar, sidebarVisible }) {
           </div>
 
           {user?.isEmployee && <PunchSystem />}
-          
+
           <Button
             className="flex items-center gap-1.5 bg-gray-500 hover:bg-gray-600 text-white font-medium py-1.5 px-2 rounded-md text-xs"
             onClick={() => setShowLogoutConfirm(true)}
@@ -318,7 +316,7 @@ export default function DashboardHeader({ toggleSidebar, sidebarVisible }) {
         open={isPunchOutDialogOpen}
         onOpenChange={setIsPunchOutDialogOpen}
       >
-        <DialogContent className="w-[90vw] max-w-[425px] md:w-full md:max-w-[600px] lg:max-w-[800px] max-h-[90vh] overflow-y-auto bg-white p-4 sm:p-6 rounded-lg">
+        <DialogContent className="w-[90vw] max-w-[425px] max-h-[90vh] overflow-y-auto bg-white p-4 sm:p-6 rounded-lg">
           <DialogHeader>
             <DialogTitle>Confirm Punch Out</DialogTitle>
             <DialogDescription>
@@ -345,7 +343,7 @@ export default function DashboardHeader({ toggleSidebar, sidebarVisible }) {
         open={isPunchOutConfirmOpen}
         onOpenChange={setIsPunchOutConfirmOpen}
       >
-        <DialogContent className="w-[90vw] max-w-[425px] md:w-full md:max-w-[600px] lg:max-w-[800px] max-h-[90vh] overflow-y-auto bg-white p-4 sm:p-6 rounded-lg">
+        <DialogContent className="w-[90vw] max-w-[425px] max-h-[90vh] overflow-y-auto bg-white p-4 sm:p-6 rounded-lg">
           <DialogHeader>
             <DialogTitle>Punch Out Confirmation</DialogTitle>
             <DialogDescription className="text-left">

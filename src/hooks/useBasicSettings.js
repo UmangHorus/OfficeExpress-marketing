@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import api from "@/lib/api/axios";
+import api, { ensureInitialized } from "@/lib/api/axios";
 import useBasicSettingsStore from "@/stores/basicSettings.store";
 
 export const useBasicSettings = () => {
@@ -11,6 +11,9 @@ export const useBasicSettings = () => {
     queryFn: async () => {
       setLoading(true);
       try {
+        // Wait for API to be initialized before making the request
+        await ensureInitialized();
+
         const response = await api.post(
           "/expo_access_api/getBasicSettings/",
           { AUTHORIZEKEY: process.env.NEXT_PUBLIC_API_AUTH_KEY },

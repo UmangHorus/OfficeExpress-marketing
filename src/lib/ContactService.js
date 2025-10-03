@@ -111,6 +111,8 @@ export const ContactService = {
     }
   },
 
+ 
+
   // Fetch contact and raw contact follow-up data
   getContactRawcontactFollowUP: async (token, formData) => {
     formData.append("AUTHORIZEKEY", AUTHORIZE_KEY || "");

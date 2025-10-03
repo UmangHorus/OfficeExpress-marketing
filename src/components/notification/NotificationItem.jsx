@@ -9,6 +9,7 @@ import {
   CalendarCheck,
   UserPlus,
   ShoppingCart,
+  FileText,
 } from "lucide-react";
 
 const getNotificationIcon = (type) => {
@@ -22,6 +23,10 @@ const getNotificationIcon = (type) => {
     case "ShoppingCart":
       return (
         <ShoppingCart {...iconProps} className="w-5 h-5 text-orange-500" />
+      );
+    case "FileText":
+      return (
+        <FileText {...iconProps} className="w-5 h-5 text-indigo-500" />
       );
     default:
       return <Bell {...iconProps} className="w-5 h-5 text-gray-500" />;
@@ -37,9 +42,8 @@ export const NotificationItem = ({ notification, onClick, onDelete }) => {
   return (
     <div
       onClick={onClick}
-      className={`relative px-6 py-4 hover:bg-gray-50 cursor-pointer transition-all duration-150 group ${
-        !notification.isRead ? "bg-blue-50/50 border-l-4 border-blue-500" : ""
-      }`}
+      className={`relative px-6 py-4 hover:bg-gray-50 cursor-pointer transition-all duration-150 group ${!notification.isRead ? "bg-blue-50/50 border-l-4 border-blue-500" : ""
+        }`}
     >
       <div className="flex items-start space-x-4">
         {/* Icon */}
@@ -54,9 +58,8 @@ export const NotificationItem = ({ notification, onClick, onDelete }) => {
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
               <p
-                className={`text-sm font-semibold ${
-                  !notification.isRead ? "text-gray-900" : "text-gray-700"
-                } mb-1 leading-tight`}
+                className={`text-sm font-semibold ${!notification.isRead ? "text-gray-900" : "text-gray-700"
+                  } mb-1 leading-tight`}
               >
                 {notification.title}
               </p>

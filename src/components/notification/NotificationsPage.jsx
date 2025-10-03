@@ -13,6 +13,7 @@ import {
   CalendarCheck,
   UserPlus,
   ShoppingCart,
+  FileText,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
@@ -70,19 +71,19 @@ const NotificationsPage = () => {
   // Enhanced timestamp formatting with error handling
   const formatTimestamp = (unixTimestamp) => {
     if (!unixTimestamp || isNaN(unixTimestamp)) return "Unknown time";
-    
+
     try {
       const now = new Date();
       const notificationDate = new Date(unixTimestamp * 1000);
       if (isNaN(notificationDate.getTime())) return "Invalid date";
-      
+
       const diffInSeconds = Math.floor((now - notificationDate) / 1000);
 
       if (diffInSeconds < 60) return "Just now";
       if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
       if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
       if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} days ago`;
-      
+
       return notificationDate.toLocaleDateString();
     } catch (error) {
       console.error("Error formatting timestamp:", error);
@@ -231,16 +232,16 @@ const NotificationsPage = () => {
     .filter((notification) => {
       const { title = "", description = "", isRead = false } = notification || {};
       const searchLower = searchQuery.toLowerCase();
-      
+
       const matchesSearch =
         title.toLowerCase().includes(searchLower) ||
         description.toLowerCase().includes(searchLower);
-        
+
       const matchesFilter =
         filterType === "all" ||
         (filterType === "unread" && !isRead) ||
         (filterType === "read" && isRead);
-        
+
       return matchesSearch && matchesFilter;
     });
 
@@ -260,6 +261,10 @@ const NotificationsPage = () => {
         return <UserPlus {...iconProps} className="text-green-500" />;
       case "ShoppingCart":
         return <ShoppingCart {...iconProps} className="text-orange-500" />;
+      case "FileText":
+        return (
+          <FileText {...iconProps} className="w-5 h-5 text-indigo-500" />
+        );
       default:
         return <Bell {...iconProps} className="text-gray-500" />;
     }
@@ -292,8 +297,8 @@ const NotificationsPage = () => {
               <p className="text-gray-500 mb-4">
                 {error?.message || "Failed to fetch notifications"}
               </p>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => refetch()}
                 disabled={isLoading}
               >
@@ -339,8 +344,8 @@ const NotificationsPage = () => {
                     className="pl-10"
                   />
                 </div>
-                <Select 
-                  value={filterType} 
+                <Select
+                  value={filterType}
                   onValueChange={(value) => {
                     setFilterType(value);
                     setCurrentPage(1);
@@ -430,9 +435,8 @@ const NotificationsPage = () => {
             {paginatedNotifications.map((notification) => (
               <Card
                 key={`${notification.id}-${notification.isRead}`}
-                className={`cursor-pointer transition-all duration-200 hover:shadow-md ${
-                  !notification.isRead ? "border-blue-200 bg-blue-50/30" : ""
-                }`}
+                className={`cursor-pointer transition-all duration-200 hover:shadow-md ${!notification.isRead ? "border-blue-200 bg-blue-50/30" : ""
+                  }`}
               >
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between">
@@ -451,11 +455,10 @@ const NotificationsPage = () => {
                           {getNotificationIcon(notification.type)}
                         </span>
                         <h3
-                          className={`font-semibold ${
-                            !notification.isRead
+                          className={`font-semibold ${!notification.isRead
                               ? "text-gray-900"
                               : "text-gray-700"
-                          }`}
+                            }`}
                         >
                           {notification.title}
                         </h3>

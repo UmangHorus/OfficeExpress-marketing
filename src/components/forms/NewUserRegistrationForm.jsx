@@ -128,32 +128,6 @@ const NewUserRegistrationForm = ({ mobile, onCancel }) => {
     }
   }, [companyData]);
 
-  // useEffect(() => {
-  //   if (companyData) {
-  //     const responseData = Array.isArray(companyData)
-  //       ? companyData[0]
-  //       : companyData;
-  //     if (
-  //       responseData?.STATUS == "SUCCESS" &&
-  //       Array.isArray(responseData?.DATA?.contacts)
-  //     ) {
-  //       setCompanyList(responseData.DATA.contacts);
-  //       if (contact && contact.name.includes("(RC)")) {
-  //         const company = responseData.DATA.contacts.find(
-  //           (c) => c.title === contact.name.split(" (")[0]
-  //         );
-  //         if (company) {
-  //           setSelectedCompany(company);
-  //           setInputValue(company.title);
-  //         }
-  //       }
-  //     } else {
-  //       console.error(responseData?.MSG || "Invalid contact response data");
-  //       setCompanyList([]);
-  //     }
-  //   }
-  // }, [companyData, contact]);
-
   useEffect(() => {
     if (stateData) {
       form.setValue("state", "", { shouldValidate: true });

@@ -20,6 +20,8 @@ import {
   ListChecks,
   Bell,
   Boxes,
+  DollarSign,
+  FileSpreadsheet,
 } from "lucide-react";
 import Image from "next/image";
 
@@ -39,6 +41,7 @@ export default function DashboardSidebar({ onNavigate }) {
   const { navConfig = {}, user = {}, appConfig = {} } = useLoginStore();
   const { permissions = {}, labels = {} } = navConfig;
   const soPermissions = appConfig?.user_role?.so || {};
+  const quotationPermissions = appConfig?.user_role?.quotation || {};
 
   // Permission checks
   const isEmployee = user?.isEmployee;
@@ -54,59 +57,80 @@ export default function DashboardSidebar({ onNavigate }) {
     );
   };
 
+  const canManageQuotations = () => {
+    if (appConfig?.isadmin === 1) return true;
+    return (
+      isEmployee &&
+      (quotationPermissions.canCreateQuotation === 1 ||
+        quotationPermissions.canViewAllQuotation === 1 )
+    );
+  };
+
   // Generate unique key for menu items
   const generateKey = (base, suffix = "") =>
-    `${base}-${
-      suffix || Math.random().toString(36).substring(2, 9)
-    }`.toLowerCase();
+    `${base}-${suffix || Math.random().toString(36).substring(2, 9)
+      }`.toLowerCase();
 
   // Navigation items configuration
   const baseNavItems = isEmployee
     ? [
-        {
-          id: "dashboard",
-          name: "Dashboard",
-          href: "/dashboard",
-          icon: <House className={ICON_SIZE} />,
-          submenu: [
-            {
-              id: "sales-analysis",
-              name: "Sales Analysis",
-              href: "/dashboard",
-            },
-          ],
-        },
-      ]
+      {
+        id: "dashboard",
+        name: "Dashboard",
+        href: "/dashboard",
+        icon: <House className={ICON_SIZE} />,
+      },
+    ]
     : [];
+
 
   const employeeNavItems = isEmployee
     ? [
-        {
-          id: "contacts",
-          name: labels.contacts || "Contact",
-          href: "/contacts",
-          icon: <UserRound className={ICON_SIZE} />,
-        },
-      ].filter(Boolean)
+      {
+        id: "contacts",
+        name: labels.contacts || "Contact",
+        href: "/contacts",
+        icon: <UserRound className={ICON_SIZE} />,
+      },
+    ].filter(Boolean)
     : [];
 
-  const conditionalNavItems = [
-    permissions.showLeads && {
-      id: "leads",
-      name: labels.leads || "Leads",
-      href: "/leads",
-      icon: <Triangle className={ICON_SIZE} />,
-      originalName: "Leads",
-    },
-    permissions.showOrders &&
-      canManageOrders() && {
-        id: "orders",
-        name: labels.orders || "Orders",
-        href: "/orders",
-        icon: <Columns2 className={ICON_SIZE} />,
-        originalName: "Orders",
+  const leadsItem = permissions.showLeads
+    ? [
+      {
+        id: "leads",
+        name: labels.leads || "Leads",
+        href: "/leads",
+        icon: <Triangle className={ICON_SIZE} />,
+        originalName: "Leads",
       },
-  ].filter(Boolean);
+    ]
+    : [];
+
+  const quotationItems =
+    permissions.showQuotations && canManageQuotations()
+      ? [
+        {
+          id: "quotations",
+          name: labels.Quotation_config_name || "Quotation",
+          href: "/quotations",
+          icon: <FileText className={ICON_SIZE} />,
+        },
+      ]
+      : [];
+
+  const ordersItem =
+    permissions.showOrders && canManageOrders()
+      ? [
+        {
+          id: "orders",
+          name: labels.orders || "Orders",
+          href: "/orders",
+          icon: <Columns2 className={ICON_SIZE} />,
+          originalName: "Orders",
+        },
+      ]
+      : [];
 
   const conditionalNavItemsForContacts = [
     permissions.showLeads && {
@@ -115,6 +139,12 @@ export default function DashboardSidebar({ onNavigate }) {
       href: "/leads",
       icon: <Triangle className={ICON_SIZE} />,
       originalName: "Leads",
+    },
+    permissions.showQuotations && {
+      id: "quotations",
+      name: labels.Quotation_config_name || "Quotation",
+      href: "/quotations",
+      icon: <FileText className={ICON_SIZE} />,
     },
     permissions.showOrders && {
       id: "orders",
@@ -128,58 +158,49 @@ export default function DashboardSidebar({ onNavigate }) {
   const followUpItems =
     !isRestrictedUser && showContactFollowups
       ? [
-          {
-            id: "follow-ups",
-            name: "Followups",
-            href: "#",
-            icon: <ListChecks className={ICON_SIZE} />,
-            submenu: [
-              {
-                id: "contact-followups",
-                name: `${labels.contacts || "Contacts"} Followups`,
-                href: "/contact-followups",
-              },
-              permissions.showLeads && {
-                id: "leads-followups",
-                name: `${labels.leads || "Leads"} Followups`,
-                href: "/leads-followups",
-              },
-            ].filter(Boolean),
-          },
-        ].filter((item) => item && item.submenu?.length > 0)
+        {
+          id: "follow-ups",
+          name: "Followups",
+          href: "#",
+          icon: <ListChecks className={ICON_SIZE} />,
+          submenu: [
+            {
+              id: "contact-followups",
+              name: `${labels.contacts || "Contacts"} Followups`,
+              href: "/contact-followups",
+            },
+            permissions.showLeads && {
+              id: "leads-followups",
+              name: `${labels.leads || "Leads"} Followups`,
+              href: "/leads-followups",
+            },
+          ].filter(Boolean),
+        },
+      ].filter((item) => item && item.submenu?.length > 0)
       : [];
 
   const reportItems =
     !isRestrictedUser && isEmployee
       ? [
-          {
-            id: "reports",
-            name: "Reports",
-            href: "/reports",
-            icon: <FileText className={ICON_SIZE} />,
-          },
-        ]
+        {
+          id: "reports",
+          name: "Reports",
+          href: "/reports",
+          icon: <FileSpreadsheet className={ICON_SIZE} />,
+        },
+      ]
       : [];
-
-  // Add this to your navigation items configuration (before combining all navItems)
-  // const customBomItems = [
-  //   {
-  //     id: "custom-bom-management",
-  //     name: "Custom BOM Management",
-  //     href: "/custom-bom-management",
-  //     icon: <Boxes  className={ICON_SIZE} />, // Using ListChecks icon or choose another
-  //   },
-  // ];
 
   const navItems = isEmployee
     ? [
-        ...baseNavItems,
-        ...employeeNavItems,
-        ...conditionalNavItems,
-        ...followUpItems,
-        ...reportItems,
-        // ...customBomItems, // Add the BOM item
-      ]
+      ...baseNavItems,
+      ...employeeNavItems,
+      ...leadsItem,
+      ...quotationItems,
+      ...ordersItem,
+      ...followUpItems,
+      ...reportItems,
+    ]
     : [...baseNavItems, ...conditionalNavItemsForContacts];
 
   const helpItems = [
@@ -189,12 +210,6 @@ export default function DashboardSidebar({ onNavigate }) {
       path: "/notifications",
       icon: <Bell className={`${ICON_SIZE} mr-2`} />,
     },
-    // {
-    //   id: "assistant",
-    //   title: "AI Assistant",
-    //   path: "/assistant",
-    //   icon: <MessageSquare className={`${ICON_SIZE} mr-2`} />,
-    // },
     {
       id: "faqs",
       title: "FAQs",
@@ -212,26 +227,24 @@ export default function DashboardSidebar({ onNavigate }) {
   };
 
   const handleNavigation = (e, href) => {
-    // Skip punch check for logout or specific paths if needed
     if (href != "/logout") {
       if (
         isEmployee &&
         ((empInTime && empOutTime) || (!empInTime && !empOutTime))
       ) {
-        e.preventDefault(); // Prevent default navigation
+        e.preventDefault();
         toast.warning("Please Punch-In to continue.", {
-          // description: "Please punch in to continue.",
           action: {
             label: "OK",
-            onClick: () => {},
+            onClick: () => { },
           },
         });
-        onNavigate?.(); // Call onNavigate when navigation is allowed
+        onNavigate?.();
         return;
       }
     }
 
-    onNavigate?.(); // Call onNavigate when navigation is allowed
+    onNavigate?.();
   };
 
   // Render helpers
@@ -245,9 +258,8 @@ export default function DashboardSidebar({ onNavigate }) {
       <div key={item.id} className="space-y-1">
         <button
           onClick={() => toggleMenu(item.id)}
-          className={`flex items-center justify-between w-full px-3 py-2 text-sm font-medium rounded-md ${
-            isActive ? ACTIVE_COLOR : INACTIVE_COLOR
-          }`}
+          className={`flex items-center justify-between w-full px-3 py-2 text-sm font-medium rounded-md ${isActive ? ACTIVE_COLOR : INACTIVE_COLOR
+            }`}
         >
           <span className="flex items-center gap-3">
             {item.icon}
@@ -266,9 +278,8 @@ export default function DashboardSidebar({ onNavigate }) {
               <Link
                 key={subItem.id}
                 href={subItem.href}
-                className={`block px-3 py-2 text-sm rounded-md ${
-                  pathname === subItem.href ? ACTIVE_COLOR : INACTIVE_COLOR
-                }`}
+                className={`block px-3 py-2 text-sm rounded-md ${pathname === subItem.href ? ACTIVE_COLOR : INACTIVE_COLOR
+                  }`}
                 onClick={(e) => handleNavigation(e, subItem.href)}
               >
                 {subItem.name}
@@ -286,9 +297,8 @@ export default function DashboardSidebar({ onNavigate }) {
       <div key={item.id} className="space-y-1">
         <Link
           href={item.href}
-          className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md ${
-            isActive ? ACTIVE_COLOR : INACTIVE_COLOR
-          }`}
+          className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md ${isActive ? ACTIVE_COLOR : INACTIVE_COLOR
+            }`}
           onClick={(e) => handleNavigation(e, item.href)}
         >
           {item.icon}
@@ -329,9 +339,8 @@ export default function DashboardSidebar({ onNavigate }) {
           <div key={item.id} className="space-y-1">
             <Link
               href={item.path}
-              className={`flex items-center px-3 py-2 text-sm rounded-md font-medium ${
-                pathname === item.path ? ACTIVE_COLOR : INACTIVE_COLOR
-              }`}
+              className={`flex items-center px-3 py-2 text-sm rounded-md font-medium ${pathname === item.path ? ACTIVE_COLOR : INACTIVE_COLOR
+                }`}
               onClick={(e) => handleNavigation(e, item.path)}
             >
               {item.icon}

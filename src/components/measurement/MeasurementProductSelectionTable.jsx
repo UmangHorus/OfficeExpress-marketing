@@ -1,7 +1,6 @@
-// File: MeasurementProductSelectionTable.jsx
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import {
   Table,
   TableBody,
@@ -16,14 +15,20 @@ import { ProductSearch } from "../inputs/search";
 import { toast } from "sonner";
 import { leadService } from "@/lib/leadService";
 import { useLoginStore } from "@/stores/auth.store";
+import ProdMultiAttrDialog from "../shared/ProdMultiAttrDialog";
+import api from "@/lib/api/axios";
 
 const MeasurementProductSelectionTable = ({
   formValues,
   setFormValues,
   productList,
 }) => {
-  const baseurl = process.env.NEXT_PUBLIC_API_BASE_URL_FALLBACK;
+  const baseurl = api.defaults.baseURL;
   const { user = {}, token } = useLoginStore();
+
+  // State for selected product and dialog open/close
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [isAttrModalOpen, setIsAttrModalOpen] = useState(false);
 
   // Function to add a new row
   const addFormFields = () => {
@@ -36,15 +41,54 @@ const MeasurementProductSelectionTable = ({
         productcode: "",
         product_image: "",
         Attribute_data: {},
+        attribute: {}, // Initialize attribute object for new rows
       },
     ]);
   };
 
   // Function to remove a row
   const removeFormFields = (index) => {
+    if (formValues.length === 1 && !formValues[0].productid) {
+      return;
+    }
+
     const newFormValues = [...formValues];
     newFormValues.splice(index, 1);
-    setFormValues(newFormValues);
+
+    const updatedFormValues = newFormValues.map((item, newIndex) => {
+      if (item.productid && item.attribute) {
+        const oldKey = Object.keys(item.attribute)[0];
+        if (oldKey) {
+          const [productId, oldIndex] = oldKey.split("_");
+          const newKey = `${productId}_${newIndex}`;
+
+          // Create new attribute object with updated key
+          const newAttribute = {};
+          newAttribute[newKey] = item.attribute[oldKey];
+
+          return {
+            ...item,
+            attribute: newAttribute,
+          };
+        }
+      }
+      return item;
+    });
+
+    if (updatedFormValues.length === 0) {
+      const baseDefault = {
+        unique_id: Date.now(),
+        productid: "",
+        productname: "",
+        productcode: "",
+        product_image: "",
+        Attribute_data: {},
+        attribute: {},
+      };
+      setFormValues([baseDefault]);
+    } else {
+      setFormValues(updatedFormValues);
+    }
   };
 
   // Handle product selection
@@ -78,6 +122,7 @@ const MeasurementProductSelectionTable = ({
           productcode: productData?.productcode ?? "",
           product_image: productData?.product_image ?? "",
           Attribute_data: productData?.Attribute_data || {},
+          attribute: newFormValues[index]?.attribute || {}, // Preserve existing attributes
         };
         setFormValues(newFormValues);
       } else {
@@ -89,6 +134,7 @@ const MeasurementProductSelectionTable = ({
           productcode: "",
           product_image: "",
           Attribute_data: {},
+          attribute: newFormValues[index]?.attribute || {},
         };
         setFormValues(newFormValues);
         toast.error(data?.MSG || "Failed to fetch product details");
@@ -103,6 +149,7 @@ const MeasurementProductSelectionTable = ({
         productcode: "",
         product_image: "",
         Attribute_data: {},
+        attribute: newFormValues[index]?.attribute || {},
       };
       setFormValues(newFormValues);
       toast.error("Error fetching product details");
@@ -111,7 +158,15 @@ const MeasurementProductSelectionTable = ({
 
   // Handle attributes click
   const handleShowAttributes = (element) => {
-    // console.log("Show attributes for:", element);
+    setSelectedProduct(element);
+    setIsAttrModalOpen(true);
+  };
+
+  // Get the number of attribute rows for a product
+  const getAttributeRowCount = (element, index) => {
+    const productAttrKey = `${element.productid}_${index}`;
+    const attrRows = element?.attribute?.[productAttrKey] || [];
+    return Array.isArray(attrRows) ? attrRows.length : 0;
   };
 
   return (
@@ -138,11 +193,11 @@ const MeasurementProductSelectionTable = ({
           <TableBody>
             {formValues.map((element, index) => (
               <TableRow key={element.unique_id} className="text-center">
-                <TableCell className="text-left">
-                  <div className="">
+                <TableCell className="text-left py-1 px-0">
+                  <div className="flex items-center">
                     <Tag
                       className={`${element.productid &&
-                          Object.keys(element.Attribute_data || {}).length > 0
+                        Object.keys(element.Attribute_data || {}).length > 0
                           ? "text-[#26994e] cursor-pointer rotate-90"
                           : "text-gray-400 cursor-not-allowed opacity-50 rotate-90"
                         }`}
@@ -160,9 +215,12 @@ const MeasurementProductSelectionTable = ({
                         Object.keys(element.Attribute_data || {}).length === 0
                       }
                     />
+                    <span className="ml-2 text-sm">
+                      ({getAttributeRowCount(element, index)} rows)
+                    </span>
                   </div>
                 </TableCell>
-                <TableCell className="text-left">
+                <TableCell className="text-left py-1 px-0">
                   <img
                     alt="product-image"
                     src={
@@ -170,10 +228,10 @@ const MeasurementProductSelectionTable = ({
                         ? `${baseurl}/viewimage/getproduct/${element.product_image}/normal`
                         : `${baseurl}/viewimage/getproduct/normal`
                     }
-                    className="w-12 h-12"
+                    className="w-8 h-8"
                   />
                 </TableCell>
-                <TableCell className="text-left">
+                <TableCell className="text-left py-1 px-0">
                   {element.productid ? (
                     <div className="w-[250px]">
                       {element.productname || ""} ({element.productcode || ""})
@@ -187,7 +245,7 @@ const MeasurementProductSelectionTable = ({
                     </div>
                   )}
                 </TableCell>
-                <TableCell className="text-left">
+                <TableCell className="text-left py-1 px-0">
                   <div className="">
                     <Trash2
                       className={`h-8 w-8 sm:h-9 sm:w-9 p-2 rounded-full ${formValues.length === 1 && !element.productid
@@ -247,7 +305,7 @@ const MeasurementProductSelectionTable = ({
                   <div className="flex items-center">
                     <Tag
                       className={`${element.productid &&
-                          Object.keys(element.Attribute_data || {}).length > 0
+                        Object.keys(element.Attribute_data || {}).length > 0
                           ? "text-[#26994e] cursor-pointer rotate-90"
                           : "text-gray-400 cursor-not-allowed opacity-50 rotate-90"
                         }`}
@@ -265,6 +323,9 @@ const MeasurementProductSelectionTable = ({
                         Object.keys(element.Attribute_data || {}).length === 0
                       }
                     />
+                    <span className="ml-2 text-sm">
+                      ({getAttributeRowCount(element, index)} rows)
+                    </span>
                   </div>
                 </div>
                 <div className="flex items-center">
@@ -278,10 +339,12 @@ const MeasurementProductSelectionTable = ({
                         ? `${baseurl}/viewimage/getproduct/${element.product_image}/normal`
                         : `${baseurl}/viewimage/getproduct/normal`
                     }
-                    className="w-12 h-12"
+                    className="w-8 h-8"
                   />
                 </div>
-                <div className="flex items-center">
+                <div
+                  className={`${element.productid ? "flex items-center" : ""}`}
+                >
                   <label className="text-sm font-medium text-gray-500 w-32">
                     Product:
                   </label>
@@ -313,6 +376,19 @@ const MeasurementProductSelectionTable = ({
           </Button>
         </div>
       </div>
+
+      {/* Attributes Dialog */}
+      <ProdMultiAttrDialog
+        key={selectedProduct?.unique_id || "no-product"}
+        open={isAttrModalOpen}
+        setOpen={setIsAttrModalOpen}
+        product={selectedProduct}
+        index={formValues.findIndex(
+          (item) => item.unique_id === selectedProduct?.unique_id
+        )}
+        formValues={formValues}
+        setFormValues={setFormValues}
+      />
     </div>
   );
 };

@@ -25,7 +25,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ChevronDown, ArrowUpDown, MapPin, Eye, Pencil } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  ChevronDown,
+  ArrowUpDown,
+  MapPin,
+  Eye,
+  Pencil,
+  CalendarCheck,
+  Ruler,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   useReactTable,
@@ -43,6 +58,8 @@ import LeadDetailsDialog from "../shared/LeadDetailsDialog";
 import { useRouter } from "next/navigation";
 import LeadFollowupForm from "../forms/LeadFollowupForm";
 import useLocationPermission from "@/hooks/useLocationPermission";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@radix-ui/react-label";
 
 const LeadTable = () => {
   const { user, token, location, appConfig } = useLoginStore();
@@ -53,6 +70,7 @@ const LeadTable = () => {
   const contactLabel = useLoginStore(
     (state) => state.navConfig?.labels?.contacts || "Contact"
   );
+  const add_measurement_config = false || appConfig?.add_measurement;
   const checkAndRequestLocation = useLocationPermission();
   const [data, setData] = useState([]);
   const [visitorFound, setVisitorFound] = useState([]);
@@ -70,6 +88,9 @@ const LeadTable = () => {
   const [selectedLead, setSelectedLead] = useState(null);
   const [selectedLeadId, setSelectedLeadId] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [isVisitOutDialogOpen, setIsVisitOutDialogOpen] = useState(false);
+  const [visitOutLead, setVisitOutLead] = useState(null);
+  const [visitOutAction, setVisitOutAction] = useState("");
   const queryClient = useQueryClient();
 
   // Check export permissions
@@ -117,7 +138,7 @@ const LeadTable = () => {
               createdate: order.lead_dt || "",
               visitStatus:
                 responseData?.DATA?.visitor_found[0]?.reference_id ==
-                  order.order_no
+                order.order_no
                   ? "out"
                   : null,
               leadstatus: mapStatus(order.status),
@@ -132,18 +153,24 @@ const LeadTable = () => {
         setVisitorFound(responseData?.DATA?.visitor_found || []);
         setData(leadList);
       } else {
-        // toast.error(responseData?.MSG || "Failed to fetch lead orders");
         console.error(responseData?.MSG || "Failed to fetch lead orders");
       }
     }
     if (leadError) {
-      // toast.error("Error fetching leads: " + leadError.message);
       console.error("Error fetching leads:", leadError.message);
     }
   }, [leadData]);
 
   const handleCreateLead = () => {
     router.push("/leads/create");
+  };
+
+  const handleAddMeasurement = (id) => {
+    const queryParams = new URLSearchParams({
+      lead_id: id,
+      ev_id: visitorFound[0]?.ev_id || "",
+    });
+    router.push(`/measurements/add?${queryParams.toString()}`);
   };
 
   const handleVisitIn = async (lead, action) => {
@@ -197,11 +224,17 @@ const LeadTable = () => {
         return;
       }
 
-      setSelectedLead({
-        id: lead.leadno,
-        // leadno: lead.leadno,
-      });
-      setIsFollowupDialogOpen(true);
+      if (add_measurement_config) {
+        // Open Visit Out Dialog if add_measurement is true
+        setVisitOutLead({ id: lead.leadno, name: lead.customername });
+        setIsVisitOutDialogOpen(true);
+      } else {
+        // Fallback to previous logic
+        setSelectedLead({
+          id: lead.leadno,
+        });
+        setIsFollowupDialogOpen(true);
+      }
     } catch (error) {
       console.error(
         "Error preparing Visit Out:",
@@ -214,9 +247,28 @@ const LeadTable = () => {
     }
   };
 
+  const handleVisitOutAction = () => {
+    if (!visitOutLead) return;
+    const { id, name } = visitOutLead;
+    switch (visitOutAction) {
+      case "followup":
+        setSelectedLead({ id, name });
+        setIsFollowupDialogOpen(true);
+        break;
+      case "measurement":
+        handleAddMeasurement(id);
+        break;
+      default:
+        toast.error("Please select an action.");
+        return;
+    }
+    setIsVisitOutDialogOpen(false);
+    setVisitOutAction("");
+    setVisitOutLead(null);
+  };
+
   const handleFollowupSubmit = async (followupData) => {
     try {
-      // First check location permissions
       await checkAndRequestLocation("followup submission");
 
       const followupResponse = await leadService.saveLeadFollowup(
@@ -234,7 +286,7 @@ const LeadTable = () => {
 
       const followupResult = followupResponse[0] || {};
       if (followupResult.STATUS === "SUCCESS") {
-        const leadType = followupData.leadType;
+        const leadType = "7";
         const visitorResponse = await ContactService.employeeVisitorInOut(
           token,
           "out",
@@ -276,54 +328,55 @@ const LeadTable = () => {
       ...(!user?.isEmployee
         ? []
         : [
-          {
-            id: "visit",
-            header: () => <div className="text-center text-white">Visit</div>,
-            cell: ({ row }) => {
-              const lead = row.original || {};
-              if (lead.visitStatus === "out") {
+            {
+              id: "visit",
+              header: () => <div className="text-center text-white">Visit</div>,
+              cell: ({ row }) => {
+                const lead = row.original || {};
+                if (lead.visitStatus === "out") {
+                  return (
+                    <div className="text-center">
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="bg-orange-600 hover:bg-orange-700 mx-auto"
+                        onClick={() => handleVisitOut(lead, "out")}
+                        disabled={
+                          disabledVisitOut ||
+                          (visitorFound.length > 0 &&
+                            lead.id != visitorFound[0]?.reference_id)
+                        }
+                      >
+                        Visit Out
+                      </Button>
+                    </div>
+                  );
+                }
                 return (
                   <div className="text-center">
                     <Button
                       variant="default"
                       size="sm"
-                      className="bg-orange-600 hover:bg-orange-700 mx-auto"
-                      onClick={() => handleVisitOut(lead, "out")}
+                      className={`mx-auto text-white ${
+                        lead.ev_id
+                          ? "bg-[#4a5a6b] hover:bg-[#5c6b7a]"
+                          : "bg-[#287f71] hover:bg-[#20665a]"
+                      }`}
+                      onClick={() => handleVisitIn(lead, "in")}
                       disabled={
-                        disabledVisitOut ||
+                        disabledVisitIn ||
                         (visitorFound.length > 0 &&
                           lead.id != visitorFound[0]?.reference_id)
                       }
                     >
-                      Visit Out
+                      Visit In
                     </Button>
                   </div>
                 );
-              }
-              return (
-                <div className="text-center">
-                  <Button
-                    variant="default"
-                    size="sm"
-                    className={`mx-auto text-white ${lead.ev_id
-                        ? "bg-[#4a5a6b] hover:bg-[#5c6b7a]"
-                        : "bg-[#287f71] hover:bg-[#20665a]"
-                      }`}
-                    onClick={() => handleVisitIn(lead, "in")}
-                    disabled={
-                      disabledVisitIn ||
-                      (visitorFound.length > 0 &&
-                        lead.id != visitorFound[0]?.reference_id)
-                    }
-                  >
-                    Visit In
-                  </Button>
-                </div>
-              );
+              },
+              enableHiding: false,
             },
-            enableHiding: false,
-          },
-        ]),
+          ]),
       {
         accessorFn: (row) => ({
           CustomerAddress: row.customer_address,
@@ -589,7 +642,7 @@ const LeadTable = () => {
       `${contactLabel} Address`,
       "Created Address",
       `${leadLabel} Number`,
-      "Create Date", // Already in "27/06/2025 03:25 pm" format
+      "Create Date",
       `${leadLabel} Title`,
       "Customer Name",
       "Created By",
@@ -606,7 +659,7 @@ const LeadTable = () => {
         escapeCsv(lead.customer_address),
         escapeCsv(lead.location),
         escapeCsv(lead.leadno),
-        escapeCsv(lead.createdate), // Use date as-is
+        escapeCsv(lead.createdate),
         escapeCsv(lead.lead_title),
         escapeCsv(lead.customername),
         escapeCsv(lead.created_by),
@@ -623,7 +676,6 @@ const LeadTable = () => {
     downloadFile(csvContent, `${leadLabel}_report_${dateStr}.csv`);
   };
 
-  // Unchanged download helper function
   const downloadFile = (content, filename) => {
     const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -653,7 +705,6 @@ const LeadTable = () => {
         </div>
       )}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 py-4">
-        {/* Search and Filter Section */}
         <div className="flex flex-col sm:flex-row gap-3 w-full">
           <Input
             placeholder={`Search ${leadLabel}...`}
@@ -663,9 +714,7 @@ const LeadTable = () => {
           />
         </div>
 
-        {/* Action Buttons Section */}
         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto sm:ml-auto">
-          {/* Columns Visibility Dropdown */}
           <div className="flex justify-end w-full sm:w-auto">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -686,15 +735,13 @@ const LeadTable = () => {
                         column.toggleVisibility(!!value)
                       }
                     >
-                      {column.id.replace(/_/g, " ")}{" "}
-                      {/* Convert underscores to spaces */}
+                      {column.id.replace(/_/g, " ")}
                     </DropdownMenuCheckboxItem>
                   ))}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
 
-          {/* Export and Create Buttons */}
           <div className="flex gap-3 w-full sm:w-auto">
             {canExport && (
               <Button
@@ -726,9 +773,9 @@ const LeadTable = () => {
                     {header.isPlaceholder
                       ? null
                       : flexRender(
-                        header.column.columnDef.header,
-                        header.getContext()
-                      )}
+                          header.column.columnDef.header,
+                          header.getContext()
+                        )}
                   </TableHead>
                 ))}
               </TableRow>
@@ -794,21 +841,13 @@ const LeadTable = () => {
               </SelectContent>
             </Select>
           </div>
-          {/* <div className="text-sm text-muted-foreground">
-            {pagination.pageIndex * pagination.pageSize + 1}-
-            {Math.min(
-              (pagination.pageIndex + 1) * pagination.pageSize,
-              data.length
-            )}{" "}
-            of {data.length} rows
-          </div> */}
           <div className="text-sm text-muted-foreground">
             {table.getFilteredRowModel().rows.length === 0
               ? "0-0 of 0 rows"
               : `${pagination.pageIndex * pagination.pageSize + 1}-${Math.min(
-                (pagination.pageIndex + 1) * pagination.pageSize,
-                table.getFilteredRowModel().rows.length
-              )} of ${table.getFilteredRowModel().rows.length} rows`}
+                  (pagination.pageIndex + 1) * pagination.pageSize,
+                  table.getFilteredRowModel().rows.length
+                )} of ${table.getFilteredRowModel().rows.length} rows`}
           </div>
           <div className="flex pagination-buttons gap-2">
             <Button
@@ -864,6 +903,87 @@ const LeadTable = () => {
           lead={selectedLead}
         />
       )}
+      <Dialog
+        open={isVisitOutDialogOpen}
+        onOpenChange={setIsVisitOutDialogOpen}
+      >
+        <DialogContent className="w-[90vw] max-w-[425px] md:w-full max-h-[90vh] overflow-y-auto bg-white p-4 sm:p-6 rounded-lg">
+          <DialogHeader>
+            <DialogTitle>Select Post Visit Action</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-4">
+            <RadioGroup
+              value={visitOutAction}
+              onValueChange={setVisitOutAction}
+              className="grid gap-4 py-4"
+            >
+              <div className="flex items-center space-x-3">
+                <RadioGroupItem
+                  value="followup"
+                  id="followup"
+                  className="text-white data-[state=checked]:border-[#287f71] [&[data-state=checked]>span>svg]:fill-[#287f71] h-5 w-5"
+                />
+                <Label
+                  htmlFor="followup"
+                  className="flex items-center gap-2 font-normal cursor-pointer"
+                >
+                  <div className="p-2 rounded-lg bg-[#287f71]/10 text-[#287f71]">
+                    <CalendarCheck className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="font-medium">Add Followup</p>
+                    <p className="text-sm text-muted-foreground">
+                      Schedule a future follow-up
+                    </p>
+                  </div>
+                </Label>
+              </div>
+              <div className="flex items-center space-x-3">
+                <RadioGroupItem
+                  value="measurement"
+                  id="measurement"
+                  className="text-white data-[state=checked]:border-[#287f71] [&[data-state=checked]>span>svg]:fill-[#287f71] h-5 w-5"
+                />
+                <Label
+                  htmlFor="measurement"
+                  className="flex items-center gap-2 font-normal cursor-pointer"
+                >
+                  <div className="p-2 rounded-lg bg-[#287f71]/10 text-[#287f71]">
+                    <Ruler className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="font-medium">Add Measurement</p>
+                    <p className="text-sm text-muted-foreground">
+                      Record a new measurement
+                    </p>
+                  </div>
+                </Label>
+              </div>
+            </RadioGroup>
+          </div>
+          <DialogFooter className="flex justify-end gap-4 flex-row">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setIsVisitOutDialogOpen(false);
+                setVisitOutAction("");
+                setVisitOutLead(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className="bg-[#287f71] hover:bg-[#20665a] text-white text-sm sm:text-base"
+              disabled={!visitOutAction}
+              onClick={handleVisitOutAction}
+            >
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

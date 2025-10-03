@@ -1,5 +1,4 @@
 "use client";
-
 import React, { useEffect, useState } from "react";
 import {
   Table,
@@ -30,6 +29,8 @@ import useBasicSettingsStore from "@/stores/basicSettings.store";
 import useDateFormatter from "@/hooks/useDateFormatter";
 import ProdAttrDialog from "../shared/ProdAttrDialog";
 import { PriceListDialog } from "../shared/PriceListDialog";
+import api from "@/lib/api/axios";
+
 
 const ProductSelectionTable = ({
   formValues,
@@ -38,14 +39,15 @@ const ProductSelectionTable = ({
   selectedtypeOption,
   selectedCompany,
   selectedContact,
-  orderIdParam,
-  salesOrderDetails,
+  entityIdParam, // Changed from orderIdParam
+  entityDetails, // Changed from salesOrderDetails
 }) => {
-  const baseurl = process.env.NEXT_PUBLIC_API_BASE_URL_FALLBACK;
+  const baseurl = api.defaults.baseURL;
   const { companyDetails } = useSharedDataStore();
   const { user = {}, appConfig = {}, token } = useLoginStore();
   const { maincompany_id, mainbranch_id } = useBasicSettingsStore();
   const { formatDateForInput } = useDateFormatter();
+  // console.log(api.defaults.baseURL, "api instance in ProductSelectionTable");
 
   const secUnitConfig = companyDetails?.sec_unit_config || "0";
   const enablepacking = companyDetails?.enable_packing;
@@ -57,12 +59,8 @@ const ProductSelectionTable = ({
   const [isAttrModalOpen, setIsAttrModalOpen] = useState(false);
   const [isPriceListModalOpen, setIsPriceListModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
-  const [selectedProductPriceList, setSelectedProductPriceList] =
-    useState(null);
-  const [
-    isSelectedProductPriceListLoading,
-    setIsSelectedProductPriceListLoading,
-  ] = useState(false);
+  const [selectedProductPriceList, setSelectedProductPriceList] = useState(null);
+  const [isSelectedProductPriceListLoading, setIsSelectedProductPriceListLoading] = useState(false);
 
   // Function to generate a unique ID
   const generateUniqueId = () => {
@@ -82,17 +80,13 @@ const ProductSelectionTable = ({
   const handleShowPriceList = async (product) => {
     setSelectedProduct(product);
     setIsPriceListModalOpen(true);
-    setIsSelectedProductPriceListLoading(true); // Start loading
+    setIsSelectedProductPriceListLoading(true);
     try {
-      const response = await leadService.getProductPriceList(
-        token,
-        product?.productid
-      );
+      const response = await leadService.getProductPriceList(token, product?.productid);
       const data = Array.isArray(response) ? response[0] : response;
       const productData = data?.DATA;
       if (data?.STATUS == "SUCCESS") {
         setSelectedProductPriceList(productData);
-        // setIsPriceListModalOpen(true);
       } else {
         toast.error(response?.MSG || "Failed to fetch price list");
       }
@@ -100,39 +94,21 @@ const ProductSelectionTable = ({
       console.error("Error fetching price list:", error);
       toast.error("Failed to fetch price list");
     } finally {
-      setIsSelectedProductPriceListLoading(false); // Stop loading
+      setIsSelectedProductPriceListLoading(false);
     }
   };
-
-  // const handlePriceListSave = (priceList) => {
-  //   const updatedFormValues = formValues.map((item) => {
-  //     if (item.unique_id == selectedProduct.unique_id) {
-  //       return {
-  //         ...item,
-  //         rate: priceList?.priceINR || item.rate,
-  //       };
-  //     }
-  //     return item;
-  //   });
-  //   setFormValues(updatedFormValues);
-  //   toast.success(`${priceList?.name || "Price list"} applied`, {
-  //     duration: 2000,
-  //   });
-  // };
 
   const handlePriceListSave = (priceList) => {
     const updatedFormValues = formValues.map((item) => {
       if (item.unique_id == selectedProduct.unique_id) {
         const isSecondaryRate =
-          selectedtypeOption == "salesorder-option" &&
+          (selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") &&
           secUnitConfig == "1" &&
           item.unit_con_mode == "3" &&
           item.conversion_flg == "2";
 
         const newRate = priceList?.priceINR || item.rate;
-        const newSecUnitRate = isSecondaryRate
-          ? parseFloat(newRate).toFixed(2)
-          : item.sec_unit_rate;
+        const newSecUnitRate = isSecondaryRate ? parseFloat(newRate).toFixed(2) : item.sec_unit_rate;
 
         const updatedItem = {
           ...item,
@@ -144,33 +120,21 @@ const ProductSelectionTable = ({
         let primaryQty = parseFloat(updatedItem.productqty) || 0;
         let rate = parseFloat(updatedItem.rate) || 0;
         let secUnitRate = parseFloat(updatedItem.sec_unit_rate) || 0;
-        let discount =
-          updatedItem.discount == ""
-            ? ""
-            : parseFloat(updatedItem.discount) || 0;
-        let discountAmount =
-          updatedItem.discount_amount == ""
-            ? ""
-            : parseFloat(updatedItem.discount_amount) || 0;
+        let discount = updatedItem.discount == "" ? "" : parseFloat(updatedItem.discount) || 0;
+        let discountAmount = updatedItem.discount_amount == "" ? "" : parseFloat(updatedItem.discount_amount) || 0;
         let subtotal = primaryQty * rate;
 
-        if (selectedtypeOption == "salesorder-option" && secUnitConfig == "1") {
+        if ((selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") && secUnitConfig == "1") {
           const convFact = parseFloat(updatedItem.secondary_base_qty) || 0;
           const conversionFlg = updatedItem.conversion_flg;
           const unitConMode = updatedItem.unit_con_mode || "1";
           let secondaryQty = parseFloat(updatedItem.SecQtyTotal) || 0;
 
           if (conversionFlg == "1") {
-            secondaryQty =
-              convFact > 0 && primaryQty > 0
-                ? (primaryQty * convFact).toFixed(2)
-                : "0";
+            secondaryQty = convFact > 0 && primaryQty > 0 ? (primaryQty * convFact).toFixed(2) : "0";
             updatedItem.SecQtyTotal = secondaryQty;
           } else if (conversionFlg == "2") {
-            primaryQty =
-              convFact > 0 && secondaryQty > 0
-                ? (secondaryQty / convFact).toFixed(2)
-                : "0";
+            primaryQty = convFact > 0 && secondaryQty > 0 ? (secondaryQty / convFact).toFixed(2) : "0";
             updatedItem.productqty = primaryQty;
           }
 
@@ -179,59 +143,41 @@ const ProductSelectionTable = ({
             calcSubtotal = secondaryQty * secUnitRate;
           } else {
             calcSubtotal =
-              conversionFlg == "2" && unitConMode != "3"
-                ? secondaryQty * (rate / convFact)
-                : primaryQty * rate;
+              conversionFlg == "2" && unitConMode != "3" ? secondaryQty * (rate / convFact) : primaryQty * rate;
           }
 
           if (discount != "" && discount > 0) {
             discountAmount = ((calcSubtotal * discount) / 100).toFixed(2);
             updatedItem.discount_amount = discountAmount;
           } else if (discountAmount != "" && discountAmount > 0) {
-            discount =
-              calcSubtotal > 0
-                ? ((discountAmount / calcSubtotal) * 100).toFixed(2)
-                : "";
+            discount = calcSubtotal > 0 ? ((discountAmount / calcSubtotal) * 100).toFixed(2) : "";
             updatedItem.discount = discount;
           }
 
-          updatedItem.totalrate = (
-            calcSubtotal - (parseFloat(updatedItem.discount_amount) || 0)
-          ).toFixed(2);
+          updatedItem.totalrate = (calcSubtotal - (parseFloat(updatedItem.discount_amount) || 0)).toFixed(2);
         } else {
           if (updatedItem.unitvalue == "0") {
             if (discount != "" && discount > 0) {
               discountAmount = ((subtotal * discount) / 100).toFixed(2);
               updatedItem.discount_amount = discountAmount;
             } else if (discountAmount != "" && discountAmount > 0) {
-              discount =
-                subtotal > 0
-                  ? ((discountAmount / subtotal) * 100).toFixed(2)
-                  : "";
+              discount = subtotal > 0 ? ((discountAmount / subtotal) * 100).toFixed(2) : "";
               updatedItem.discount = discount;
             }
-            updatedItem.totalrate = (
-              subtotal - (parseFloat(updatedItem.discount_amount) || 0)
-            ).toFixed(2);
+            updatedItem.totalrate = (subtotal - (parseFloat(updatedItem.discount_amount) || 0)).toFixed(2);
           } else {
             const convFact = parseFloat(updatedItem.secondary_base_qty) || 0;
-            let newvalue =
-              convFact > 0 && primaryQty > 0 ? primaryQty / convFact : 0;
+            let newvalue = convFact > 0 && primaryQty > 0 ? primaryQty / convFact : 0;
             let adjustedSubtotal = newvalue * rate;
 
             if (discount != "" && discount > 0) {
               discountAmount = ((adjustedSubtotal * discount) / 100).toFixed(2);
               updatedItem.discount_amount = discountAmount;
             } else if (discountAmount != "" && discountAmount > 0) {
-              discount =
-                adjustedSubtotal > 0
-                  ? ((discountAmount / adjustedSubtotal) * 100).toFixed(2)
-                  : "";
+              discount = adjustedSubtotal > 0 ? ((discountAmount / adjustedSubtotal) * 100).toFixed(2) : "";
               updatedItem.discount = discount;
             }
-            updatedItem.totalrate = (
-              adjustedSubtotal - (parseFloat(updatedItem.discount_amount) || 0)
-            ).toFixed(2);
+            updatedItem.totalrate = (adjustedSubtotal - (parseFloat(updatedItem.discount_amount) || 0)).toFixed(2);
           }
         }
 
@@ -246,108 +192,6 @@ const ProductSelectionTable = ({
     });
   };
 
-  // comment by umang on 02-09-2025 
-  // const getInitialFormValues = (
-  //   selectedtypeOption,
-  //   secUnitConfig,
-  //   product = null
-  // ) => {
-  //   let discount = product?.total_discount || "";
-  //   let discount_amount = "";
-  //   if (product?.total_discount && parseFloat(product.total_discount) > 0) {
-  //     let baseAmount = 0;
-  //     if (product?.conversion_flg != "") {
-  //       if (product.unit_con_mode == "1" && product.conversion_flg == "1") {
-  //         baseAmount =
-  //           parseFloat(product.productqty || "0") *
-  //           parseFloat(product.rate || "0");
-  //       } else if (
-  //         product.unit_con_mode == "1" &&
-  //         product.conversion_flg == "2"
-  //       ) {
-  //         baseAmount =
-  //           (parseFloat(product.SecQtyTotal || "0") *
-  //             parseFloat(product.rate || "0")) /
-  //           parseFloat(product.secondary_base_qty || "1");
-  //       } else if (
-  //         product.unit_con_mode == "3" &&
-  //         product.conversion_flg == "2"
-  //       ) {
-  //         baseAmount =
-  //           parseFloat(product.SecQtyTotal || "0") *
-  //           parseFloat(product.sec_unit_rate || "0");
-  //       } else {
-  //         baseAmount =
-  //           parseFloat(product.productqty || "0") *
-  //           parseFloat(product.rate || "0");
-  //       }
-  //     } else {
-  //       baseAmount =
-  //         parseFloat(product.productqty || "0") *
-  //         parseFloat(product.rate || "0");
-  //     }
-  //     discount_amount = (
-  //       baseAmount *
-  //       (parseFloat(product.total_discount || "0") / 100)
-  //     ).toFixed(2);
-  //   }
-
-  //   const baseFormValues = {
-  //     unique_id: product?.unique_id || generateUniqueId(), // Ensure unique_id is always set
-  //     productid: product?.productid || "",
-  //     productname: product?.productname || "",
-  //     sop_id: product?.sop_id || "",
-  //     stock: product?.current_stock || "",
-  //     rate: product?.rate || "",
-  //     mrp_price: product?.mrp_price || "",
-  //     sec_unit_mrp_rate: product?.sec_unit_mrp_rate || "",
-  //     product_image: product?.product_image || "",
-  //     secondary_base_qty: product?.secondary_base_qty || "0",
-  //     productcode: product?.productcode || "",
-  //     SecQtyReverseCalculate: product?.SecQtyReverseCalculate || "0",
-  //     stock_data: product?.stock_data || [],
-  //     // pricelist_data: product?.pricelist_data || {},
-  //     price_list_flg: product?.price_list_flg || false, // Added price_list_flg
-  //     Attribute_data: product?.Attribute_data || {},
-  //     attribute: {},
-  //     proddivision: product?.proddivision || "",
-  //     unit_con_mode: product?.unit_con_mode || null,
-  //     sec_unit_rate: product?.sec_unit_rate || "0",
-  //     discount: discount,
-  //     discount_amount: discount_amount,
-  //     totalrate: product?.totalrate
-  //       ? (
-  //         parseFloat(product.totalrate) - parseFloat(discount_amount)
-  //       ).toString()
-  //       : "0.00",
-  //     scheduleDate: product?.scheduleDate
-  //       ? formatDateForInput(product.scheduleDate)
-  //       : format(new Date(), "yyyy-MM-dd"),
-  //     ...(selectedtypeOption == "lead-option" ||
-  //       (selectedtypeOption == "salesorder-option" && secUnitConfig == "0")
-  //       ? {
-  //         unit: product?.unit || "",
-  //         sec_unit: product?.sec_unit || "",
-  //         unitvalue: product?.unitvalue || "0",
-  //         productqty: product?.productqty || "",
-  //       }
-  //       : {}),
-  //     ...(selectedtypeOption == "salesorder-option" && secUnitConfig == "1"
-  //       ? {
-  //         primary_unit_id: product?.primary_unit_id || "",
-  //         secondary_unit_id: product?.secondary_unit_id || "",
-  //         conversion_flg: product?.conversion_flg || "1",
-  //         SecQtyTotal: product?.SecQtyTotal || "",
-  //         productqty: product?.productqty || "",
-  //       }
-  //       : {}),
-  //   };
-
-  //   return product
-  //     ? baseFormValues
-  //     : [{ ...baseFormValues, unique_id: generateUniqueId() }];
-  // };
-
   const getInitialFormValues = (selectedtypeOption, secUnitConfig, product = null) => {
     let discount = product?.total_discount || "";
     let discount_amount = "";
@@ -358,20 +202,16 @@ const ProductSelectionTable = ({
     // Initialize variables for calculations
     let primaryQty = parseFloat(product?.productqty) || 0;
     let rate = parseFloat(product?.rate) || 0;
-
-    // Use product?.rate instead of product?.sec_unit_rate when orderIdParam is present
-    let secUnitRate = orderIdParam
-      ? parseFloat(product?.rate) || 0
-      : parseFloat(product?.sec_unit_rate) || 0;
-
+    let secUnitRate = entityIdParam ? parseFloat(product?.rate) || 0 : parseFloat(product?.sec_unit_rate) || 0;
     let secondaryQty = parseFloat(product?.SecQtyTotal) || 0;
     const convFact = parseFloat(product?.secondary_base_qty) || 0;
     const conversionFlg = product?.conversion_flg || "1";
     const unitConMode = product?.unit_con_mode || "1";
+
     // Calculate subtotal and discount_amount based on handleChange logic
     if (
       selectedtypeOption == "lead-option" ||
-      (selectedtypeOption == "salesorder-option" && secUnitConfig == "0")
+      ((selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") && secUnitConfig == "0")
     ) {
       if (secUnitConfig == "0" || product?.unitvalue == "0") {
         subtotal = primaryQty * rate;
@@ -379,10 +219,7 @@ const ProductSelectionTable = ({
           discount_amount = ((subtotal * parseFloat(discount)) / 100).toFixed(2);
         } else if (product?.discount_amount && parseFloat(product.discount_amount) > 0) {
           discount_amount = parseFloat(product.discount_amount).toFixed(2);
-          discount =
-            subtotal > 0
-              ? ((parseFloat(discount_amount) / subtotal) * 100).toFixed(2)
-              : "";
+          discount = subtotal > 0 ? ((parseFloat(discount_amount) / subtotal) * 100).toFixed(2) : "";
         }
         totalrate = (subtotal - (parseFloat(discount_amount) || 0)).toFixed(2);
       } else {
@@ -392,39 +229,29 @@ const ProductSelectionTable = ({
           discount_amount = ((adjustedSubtotal * parseFloat(discount)) / 100).toFixed(2);
         } else if (product?.discount_amount && parseFloat(product.discount_amount) > 0) {
           discount_amount = parseFloat(product.discount_amount).toFixed(2);
-          discount =
-            adjustedSubtotal > 0
-              ? ((parseFloat(discount_amount) / adjustedSubtotal) * 100).toFixed(2)
-              : "";
+          discount = adjustedSubtotal > 0 ? ((parseFloat(discount_amount) / adjustedSubtotal) * 100).toFixed(2) : "";
         }
         totalrate = (adjustedSubtotal - (parseFloat(discount_amount) || 0)).toFixed(2);
       }
-    } else if (selectedtypeOption == "salesorder-option" && secUnitConfig == "1") {
+    } else if ((selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") && secUnitConfig == "1") {
       if (conversionFlg == "1") {
-        secondaryQty =
-          convFact > 0 && primaryQty > 0 ? (primaryQty * convFact).toFixed(2) : "0";
+        secondaryQty = convFact > 0 && primaryQty > 0 ? (primaryQty * convFact).toFixed(2) : "0";
       } else if (conversionFlg == "2") {
-        primaryQty =
-          convFact > 0 && secondaryQty > 0 ? (secondaryQty / convFact).toFixed(2) : "0";
+        primaryQty = convFact > 0 && secondaryQty > 0 ? (secondaryQty / convFact).toFixed(2) : "0";
       }
 
       if (unitConMode == "3" && conversionFlg == "2") {
         calcSubtotal = secondaryQty * secUnitRate;
       } else {
         calcSubtotal =
-          conversionFlg == "2" && unitConMode != "3"
-            ? secondaryQty * (rate / convFact)
-            : primaryQty * rate;
+          conversionFlg == "2" && unitConMode != "3" ? secondaryQty * (rate / convFact) : primaryQty * rate;
       }
 
       if (discount !== "" && parseFloat(discount) > 0) {
         discount_amount = ((calcSubtotal * parseFloat(discount)) / 100).toFixed(2);
       } else if (product?.discount_amount && parseFloat(product.discount_amount) > 0) {
         discount_amount = parseFloat(product.discount_amount).toFixed(2);
-        discount =
-          calcSubtotal > 0
-            ? ((parseFloat(discount_amount) / calcSubtotal) * 100).toFixed(2)
-            : "";
+        discount = calcSubtotal > 0 ? ((parseFloat(discount_amount) / calcSubtotal) * 100).toFixed(2) : "";
       }
       totalrate = (calcSubtotal - (parseFloat(discount_amount) || 0)).toFixed(2);
     }
@@ -434,6 +261,7 @@ const ProductSelectionTable = ({
       productid: product?.productid || "",
       productname: product?.productname || "",
       sop_id: product?.sop_id || "",
+      qp_id: product?.qp_id || "",
       stock: product?.current_stock || "",
       rate: product?.rate || "",
       mrp_price: product?.mrp_price || "",
@@ -448,12 +276,7 @@ const ProductSelectionTable = ({
       attribute: {},
       proddivision: product?.proddivision || "",
       unit_con_mode: product?.unit_con_mode || null,
-      
-      // Use product?.rate instead of product?.sec_unit_rate when orderIdParam is present
-      sec_unit_rate: orderIdParam
-        ? product?.rate || "0"
-        : product?.sec_unit_rate || "0",
-
+      sec_unit_rate: entityIdParam ? product?.rate || "0" : product?.sec_unit_rate || "0",
       discount: discount,
       discount_amount: discount_amount,
       totalrate: totalrate,
@@ -461,15 +284,15 @@ const ProductSelectionTable = ({
         ? formatDateForInput(product.scheduleDate)
         : format(new Date(), "yyyy-MM-dd"),
       ...(selectedtypeOption == "lead-option" ||
-        (selectedtypeOption == "salesorder-option" && secUnitConfig == "0")
+        ((selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") && secUnitConfig == "0"))
         ? {
           unit: product?.unit || "",
           sec_unit: product?.sec_unit || "",
           unitvalue: product?.unitvalue || "0",
           productqty: product?.productqty || "",
         }
-        : {}),
-      ...(selectedtypeOption == "salesorder-option" && secUnitConfig == "1"
+        : {},
+      ...((selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") && secUnitConfig == "1")
         ? {
           primary_unit_id: product?.primary_unit_id || "",
           secondary_unit_id: product?.secondary_unit_id || "",
@@ -479,93 +302,73 @@ const ProductSelectionTable = ({
           SecQtyTotal: product?.SecQtyTotal || secondaryQty || "",
           productqty: product?.productqty || primaryQty || "",
         }
-        : {}),
+        : {},
     };
 
     return product ? baseFormValues : [{ ...baseFormValues, unique_id: generateUniqueId() }];
   };
 
   useEffect(() => {
-    if (orderIdParam && salesOrderDetails?.Products?.length > 0) {
-      const initialFormValues = salesOrderDetails.Products.map(
-        (product, idx) => {
-          let base = getInitialFormValues(selectedtypeOption, secUnitConfig, {
-            ...product,
-            unique_id: product.unique_id || generateUniqueId(),
-          });
+    if (entityIdParam && entityDetails?.Products?.length > 0) {
+      const initialFormValues = entityDetails.Products.map((product, idx) => {
+        let base = getInitialFormValues(selectedtypeOption, secUnitConfig, {
+          ...product,
+          unique_id: product.unique_id || generateUniqueId(),
+        });
 
-          // Compute initialAttributes using Attribute_data and prefer values from Attribute_data_1 if available
-          const productAttrKey = `${product.productid}_${idx}`;
-          const initialAttributes = {};
+        // Compute initialAttributes using Attribute_data and prefer values from Attribute_data_1 if available
+        const productAttrKey = `${product.productid}_${idx}`;
+        const initialAttributes = {};
 
-          if (product.Attribute_data) {
-            Object.entries(product.Attribute_data).forEach(
-              ([attrId, attrData]) => {
-                let valueID = attrData.ValueID;
+        if (product.Attribute_data) {
+          Object.entries(product.Attribute_data).forEach(([attrId, attrData]) => {
+            let valueID = attrData.ValueID;
 
-                // Find matching entry in Attribute_data_1 by id
-                const attr1 = product.Attribute_data_1?.find(
-                  (a) => a.id == attrId || a.id == attrId.toString()
-                );
+            // Find matching entry in Attribute_data_1 by id
+            const attr1 = product.Attribute_data_1?.find(
+              (a) => a.id == attrId || a.id == attrId.toString()
+            );
 
-                // Use value from Attribute_data_1 if available and valid
-                if (
-                  attr1 &&
-                  typeof attr1.value === "string" &&
-                  attr1.value.trim() !== "" &&
-                  attr1.value !== "undefined" &&
-                  attr1.value !== null
-                ) {
-                  valueID = attr1.value;
-                }
+            // Use value from Attribute_data_1 if available and valid
+            if (
+              attr1 &&
+              typeof attr1.value === "string" &&
+              attr1.value.trim() !== "" &&
+              attr1.value !== "undefined" &&
+              attr1.value !== null
+            ) {
+              valueID = attr1.value;
+            }
 
-                if (
-                  (attrData.Type == "3" || attrData.Type == "2") &&
-                  attrData.Masters
-                ) {
-                  // For select type attributes with Masters
-                  const masters = Array.isArray(attrData.Masters)
-                    ? attrData.Masters
-                    : Object.values(attrData.Masters);
+            if ((attrData.Type == "3" || attrData.Type == "2") && attrData.Masters) {
+              const masters = Array.isArray(attrData.Masters)
+                ? attrData.Masters
+                : Object.values(attrData.Masters);
 
-                  if (valueID) {
-                    // Find matching master by N (name)
-                    const matchedMaster = masters.find(
-                      (master) => master.N == valueID
-                    );
-
-                    if (matchedMaster) {
-                      initialAttributes[attrId] = matchedMaster.ID;
-                    }
-                  }
-                } else if (valueID) {
-                  // For other types, use valueID if available
-                  let value = valueID;
-                  if (attrData.Type == "6") {
-                    // Strip time component from date if present (e.g., "19/03/2025 02:20" -> "19/03/2025")
-                    value = value?.split(" ")[0] ?? "";
-                  }
-                  initialAttributes[attrId] = value;
+              if (valueID) {
+                const matchedMaster = masters.find((master) => master.N == valueID);
+                if (matchedMaster) {
+                  initialAttributes[attrId] = matchedMaster.ID;
                 }
               }
-            );
-          }
-
-          base.attribute = { [productAttrKey]: initialAttributes };
-          return base;
+            } else if (valueID) {
+              let value = valueID;
+              if (attrData.Type == "6") {
+                value = value?.split(" ")[0] ?? "";
+              }
+              initialAttributes[attrId] = value;
+            }
+          });
         }
-      );
+
+        base.attribute = { [productAttrKey]: initialAttributes };
+        return base;
+      });
       setFormValues(initialFormValues);
     } else if (!formValues.length) {
       setFormValues(getInitialFormValues(selectedtypeOption, secUnitConfig));
     }
-  }, [
-    orderIdParam,
-    salesOrderDetails,
-    selectedtypeOption,
-    secUnitConfig,
-    setFormValues,
-  ]);
+  }, [entityIdParam, entityDetails, selectedtypeOption, secUnitConfig, setFormValues]);
 
   useEffect(() => {
     if (user?.isEmployee && !selectedContact) {
@@ -575,19 +378,13 @@ const ProductSelectionTable = ({
         toast.error("Please select a contact to add products");
       }
     }
-  }, [
-    selectedContact,
-    user?.isEmployee,
-    selectedtypeOption,
-    secUnitConfig,
-    setFormValues,
-  ]);
+  }, [selectedContact, user?.isEmployee, selectedtypeOption, secUnitConfig, setFormValues]);
 
   const resetProductFields = (index) => {
     let newFormValues = [...formValues];
     newFormValues[index] = {
       ...newFormValues[index],
-      unique_id: newFormValues[index].unique_id || generateUniqueId(), // Preserve or set unique_id
+      unique_id: newFormValues[index].unique_id || generateUniqueId(),
       productid: "",
       productname: "",
       stock: "",
@@ -599,8 +396,7 @@ const ProductSelectionTable = ({
       productcode: "",
       SecQtyReverseCalculate: "0",
       stock_data: [],
-      // pricelist_data: {},
-      price_list_flg: false, // Added price_list_flg
+      price_list_flg: false,
       Attribute_data: {},
       attribute: {},
       proddivision: "",
@@ -610,15 +406,15 @@ const ProductSelectionTable = ({
       discount_amount: "",
       totalrate: "0.00",
       ...(selectedtypeOption == "lead-option" ||
-        (selectedtypeOption == "salesorder-option" && secUnitConfig == "0")
+        ((selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") && secUnitConfig == "0"))
         ? {
           unit: "",
           sec_unit: "",
           unitvalue: "0",
           productqty: "",
         }
-        : {}),
-      ...(selectedtypeOption == "salesorder-option" && secUnitConfig == "1"
+        : {},
+      ...((selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") && secUnitConfig == "1")
         ? {
           primary_unit_id: "",
           secondary_unit_id: "",
@@ -626,119 +422,120 @@ const ProductSelectionTable = ({
           SecQtyTotal: "",
           productqty: "",
         }
-        : {}),
+        : {},
     };
     return newFormValues;
   };
 
-  const getProductUnit = async (product, index) => {
-    try {
-      if (!token || !product?.product_id) {
-        throw new Error("Invalid parameters: Missing required fields");
-      }
+ const getProductUnit = async (product, index) => {
+  try {
+    if (!token || !product?.product_id) {
+      throw new Error("Invalid parameters: Missing required fields");
+    }
 
-      const contactId = user?.isEmployee ? selectedContact?.id : user?.id;
-      const contactType = user?.isEmployee ? selectedContact?.type : user?.type;
-      const companyId = user?.isEmployee ? selectedCompany : maincompany_id;
-      const branchId = user?.isEmployee ? appConfig?.branch_id : mainbranch_id;
+    const contactId = user?.isEmployee ? selectedContact?.id : user?.id;
+    const contactType = user?.isEmployee ? selectedContact?.type : user?.type;
+    const companyId = user?.isEmployee ? selectedCompany : maincompany_id;
+    const branchId = user?.isEmployee ? appConfig?.branch_id : mainbranch_id;
 
-      if (!contactId || !contactType || !companyId || !branchId) {
-        throw new Error("Missing required parameters for API call");
-      }
+    if (!contactId || !contactType || !companyId || !branchId) {
+      throw new Error("Missing required parameters for API call");
+    }
 
-      const response = await leadService.getProductUnit(
-        token,
-        product?.product_id,
-        contactId,
-        contactType,
-        companyId,
-        branchId
-      );
-      const data = Array.isArray(response) ? response[0] : response;
-      const productData = data?.DATA;
+    const response = await leadService.getProductUnit(
+      token,
+      product?.product_id,
+      contactId,
+      contactType,
+      companyId,
+      branchId
+    );
+    const data = Array.isArray(response) ? response[0] : response;
+    const productData = data?.DATA;
 
-      if (data?.STATUS == "SUCCESS") {
-        let newFormValues = [...formValues];
-        newFormValues[index]["unique_id"] =
-          newFormValues[index].unique_id || generateUniqueId();
+    if (data?.STATUS == "SUCCESS") {
+      let newFormValues = [...formValues];
+
+      // Check if productData contains components
+      if (productData?.components && Array.isArray(productData.components) && productData.components.length > 0) {
+        // Remove the current index if it exists to avoid duplication
+        if (newFormValues[index]) {
+          newFormValues.splice(index, 1);
+        }
+
+        // Map each component to a new form value entry
+        const componentFormValues = productData.components.map((component, idx) => {
+          const contactDefaultDiscount = parseFloat(component?.contact_default_discount);
+          const uniqueId = generateUniqueId();
+
+          return {
+            unique_id: uniqueId,
+            productid: component?.product_id ?? "",
+            productname: product?.name ?? "", // Use the parent product name
+            stock: component?.current_stock ?? "",
+            rate: component?.productrate ?? "",
+            mrp_price: component?.mrp_price ?? "",
+            sec_unit_mrp_rate: component?.sec_unit_mrp_rate ?? "",
+            product_image: component?.product_image ?? "",
+            secondary_base_qty: component?.prod_conversion ?? "0",
+            productcode: component?.productcode ?? "",
+            SecQtyReverseCalculate: component?.SecQtyReverseCalculate ?? "0",
+            stock_data: Array.isArray(component?.stock_data) ? component?.stock_data : [],
+            price_list_flg: component?.price_list_flg || false,
+            Attribute_data: component?.Attribute_data || {},
+            attribute: {},
+            proddivision: component?.proddivision ?? "",
+            unit_con_mode: component?.unit_con_mode ?? null,
+            sec_unit_rate: component?.sec_unit_rate ?? "0",
+            discount: !isNaN(contactDefaultDiscount) ? contactDefaultDiscount.toString() : "",
+            discount_amount: "",
+            totalrate: "0.00",
+            scheduleDate: format(new Date(), "yyyy-MM-dd"),
+            ...(selectedtypeOption == "lead-option" ||
+            ((selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") && secUnitConfig == "0"))
+              ? {
+                  unit: component?.unit_name ?? "",
+                  sec_unit: component?.second_unit ?? "",
+                  unitvalue: "0",
+                  productqty: "",
+                }
+              : {},
+            ...((selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") && secUnitConfig == "1")
+              ? {
+                  primary_unit_id: component?.primary_unit_id ?? "",
+                  secondary_unit_id: component?.secondary_unit_id ?? "",
+                  conversion_flg: "1",
+                  SecQtyTotal: "",
+                  productqty: "",
+                }
+              : {},
+          };
+        });
+
+        // Insert component form values at the current index
+        newFormValues.splice(index, 0, ...componentFormValues);
+      } else {
+        // Handle single product (no components)
+        newFormValues[index]["unique_id"] = newFormValues[index].unique_id || generateUniqueId();
         newFormValues[index]["productid"] = product?.product_id ?? "";
         newFormValues[index]["productname"] = product?.name ?? "";
         newFormValues[index]["stock"] = productData?.current_stock ?? "";
         newFormValues[index]["rate"] = productData?.productrate ?? "";
         newFormValues[index]["mrp_price"] = productData?.mrp_price ?? "";
         newFormValues[index]["sec_unit_mrp_rate"] = productData?.sec_unit_mrp_rate ?? "";
-        newFormValues[index]["product_image"] =
-          productData?.product_image ?? "";
-        newFormValues[index]["secondary_base_qty"] =
-          productData?.prod_conversion ?? "0";
+        newFormValues[index]["product_image"] = productData?.product_image ?? "";
+        newFormValues[index]["secondary_base_qty"] = productData?.prod_conversion ?? "0";
         newFormValues[index]["productcode"] = productData?.productcode ?? "";
-        newFormValues[index]["SecQtyReverseCalculate"] =
-          productData?.SecQtyReverseCalculate ?? "0";
-        newFormValues[index]["stock_data"] = Array.isArray(
-          productData?.stock_data
-        )
-          ? productData?.stock_data
-          : [];
-        // newFormValues[index]["pricelist_data"] =
-        //   productData?.pricelist_data || {};
-        newFormValues[index]["price_list_flg"] =
-          productData?.price_list_flg || false;
-        newFormValues[index]["Attribute_data"] =
-          productData?.Attribute_data || {};
+        newFormValues[index]["SecQtyReverseCalculate"] = productData?.SecQtyReverseCalculate ?? "0";
+        newFormValues[index]["stock_data"] = Array.isArray(productData?.stock_data) ? productData?.stock_data : [];
+        newFormValues[index]["price_list_flg"] = productData?.price_list_flg || false;
+        newFormValues[index]["Attribute_data"] = productData?.Attribute_data || {};
         newFormValues[index]["attribute"] = {};
-
-        // Initialize attribute values
-        if (productData?.Attribute_data) {
-          const productAttrKey = `${product?.product_id}_${index}`;
-          const initialAttributes = {};
-
-          Object.entries(productData.Attribute_data).forEach(
-            ([attrId, attrData]) => {
-              if (
-                (attrData.Type == "3" || attrData.Type == "2") &&
-                attrData.Masters
-              ) {
-                // For select type attributes with Masters
-                const masters = Array.isArray(attrData.Masters)
-                  ? attrData.Masters
-                  : Object.values(attrData.Masters);
-
-                if (attrData.ValueID) {
-                  // Find matching master by N (name)
-                  const matchedMaster = masters.find(
-                    (master) => master.N == attrData.ValueID
-                  );
-
-                  if (matchedMaster) {
-                    initialAttributes[attrId] = matchedMaster.ID;
-                  }
-                }
-              } else if (attrData.ValueID) {
-                // For other types, use ValueID if available
-                let value = attrData.ValueID;
-                if (attrData.Type == "6") {
-                  // Strip time component from date if present (e.g., "19/03/2025 02:20" -> "19/03/2025")
-                  value = value?.split(" ")[0] ?? "";
-                }
-                initialAttributes[attrId] = value;
-              }
-            }
-          );
-
-          newFormValues[index]["attribute"] = {
-            [productAttrKey]: initialAttributes,
-          };
-        }
-
         newFormValues[index]["proddivision"] = productData?.proddivision ?? "";
-        newFormValues[index]["unit_con_mode"] =
-          productData?.unit_con_mode ?? null;
-        newFormValues[index]["sec_unit_rate"] =
-          productData?.sec_unit_rate ?? "0";
+        newFormValues[index]["unit_con_mode"] = productData?.unit_con_mode ?? null;
+        newFormValues[index]["sec_unit_rate"] = productData?.sec_unit_rate ?? "0";
 
-        const contactDefaultDiscount = parseFloat(
-          productData?.contact_default_discount
-        );
+        const contactDefaultDiscount = parseFloat(productData?.contact_default_discount);
         if (!isNaN(contactDefaultDiscount)) {
           newFormValues[index]["discount"] = contactDefaultDiscount.toString();
         } else {
@@ -747,32 +544,31 @@ const ProductSelectionTable = ({
 
         if (
           selectedtypeOption == "lead-option" ||
-          (selectedtypeOption == "salesorder-option" && secUnitConfig == "0")
+          ((selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") && secUnitConfig == "0")
         ) {
           newFormValues[index]["unit"] = productData?.unit_name ?? "";
           newFormValues[index]["sec_unit"] = productData?.second_unit ?? "";
         }
 
-        if (selectedtypeOption == "salesorder-option" && secUnitConfig == "1") {
-          newFormValues[index]["primary_unit_id"] =
-            productData?.primary_unit_id ?? "";
-          newFormValues[index]["secondary_unit_id"] =
-            productData?.secondary_unit_id ?? "";
+        if ((selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") && secUnitConfig == "1") {
+          newFormValues[index]["primary_unit_id"] = productData?.primary_unit_id ?? "";
+          newFormValues[index]["secondary_unit_id"] = productData?.secondary_unit_id ?? "";
         }
-
-        setFormValues(newFormValues);
-      } else {
-        const newFormValues = resetProductFields(index);
-        setFormValues(newFormValues);
-        toast.error(data?.MSG || "Failed to fetch product details");
       }
-    } catch (error) {
-      console.error("Error fetching product unit:", error);
+
+      setFormValues(newFormValues);
+    } else {
       const newFormValues = resetProductFields(index);
       setFormValues(newFormValues);
-      toast.error("Error fetching product details");
+      toast.error(data?.MSG || "Failed to fetch product details");
     }
-  };
+  } catch (error) {
+    console.error("Error fetching product unit:", error);
+    const newFormValues = resetProductFields(index);
+    setFormValues(newFormValues);
+    toast.error("Error fetching product details");
+  }
+};
 
   const productSelect = (product, index) => {
     if (!product?.product_id) return;
@@ -784,15 +580,9 @@ const ProductSelectionTable = ({
 
     const regex = /^(\d*\.?\d*)?$/;
     if (
-      [
-        "productqty",
-        "SecQtyTotal",
-        "rate",
-        "discount",
-        "discount_amount",
-        "secondary_base_qty",
-        "sec_unit_rate",
-      ].includes(name) &&
+      ["productqty", "SecQtyTotal", "rate", "discount", "discount_amount", "secondary_base_qty", "sec_unit_rate"].includes(
+        name
+      ) &&
       value !== "" &&
       !regex.test(value)
     ) {
@@ -833,37 +623,23 @@ const ProductSelectionTable = ({
     let primaryQty = parseFloat(newFormValues[index]["productqty"]) || 0;
     let rate = parseFloat(newFormValues[index]["rate"]) || 0;
     let secUnitRate = parseFloat(newFormValues[index]["sec_unit_rate"]) || 0;
-    let discount =
-      newFormValues[index]["discount"] === ""
-        ? ""
-        : parseFloat(newFormValues[index]["discount"]) || 0;
+    let discount = newFormValues[index]["discount"] === "" ? "" : parseFloat(newFormValues[index]["discount"]) || 0;
     let discountAmount =
-      newFormValues[index]["discount_amount"] === ""
-        ? ""
-        : parseFloat(newFormValues[index]["discount_amount"]) || 0;
+      newFormValues[index]["discount_amount"] === "" ? "" : parseFloat(newFormValues[index]["discount_amount"]) || 0;
     let subtotal = primaryQty * rate;
 
     if (
       selectedtypeOption == "lead-option" ||
-      (selectedtypeOption == "salesorder-option" && secUnitConfig == "0")
+      ((selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") && secUnitConfig == "0")
     ) {
-      if (
-        name === "unitvalue" ||
-        name === "productqty" ||
-        name === "rate" ||
-        name === "discount" ||
-        name === "discount_amount"
-      ) {
+      if (name === "unitvalue" || name === "productqty" || name === "rate" || name === "discount" || name === "discount_amount") {
         if (newFormValues[index]["unitvalue"] == "0") {
           if (name === "productqty" || name === "rate") {
             if (discount !== "" && discount > 0) {
               discountAmount = ((subtotal * discount) / 100).toFixed(2);
               newFormValues[index]["discount_amount"] = discountAmount;
             } else if (discountAmount !== "" && discountAmount > 0) {
-              discount =
-                subtotal > 0
-                  ? ((discountAmount / subtotal) * 100).toFixed(2)
-                  : "";
+              discount = subtotal > 0 ? ((discountAmount / subtotal) * 100).toFixed(2) : "";
               newFormValues[index]["discount"] = discount;
             }
           }
@@ -878,37 +654,22 @@ const ProductSelectionTable = ({
             if (value === "") {
               newFormValues[index]["discount"] = "";
             } else if (discountAmount > 0) {
-              discount =
-                subtotal > 0
-                  ? ((discountAmount / subtotal) * 100).toFixed(2)
-                  : "";
+              discount = subtotal > 0 ? ((discountAmount / subtotal) * 100).toFixed(2) : "";
               newFormValues[index]["discount"] = discount;
             }
           }
-          newFormValues[index]["totalrate"] = (
-            subtotal -
-            (parseFloat(newFormValues[index]["discount_amount"]) || 0)
-          ).toFixed(2);
+          newFormValues[index]["totalrate"] = (subtotal - (parseFloat(newFormValues[index]["discount_amount"]) || 0)).toFixed(2);
         } else {
-          const convFact =
-            parseFloat(newFormValues[index]["secondary_base_qty"]) || 0;
-          let newvalue =
-            convFact > 0 && primaryQty > 0 ? primaryQty / convFact : 0;
+          const convFact = parseFloat(newFormValues[index]["secondary_base_qty"]) || 0;
+          let newvalue = convFact > 0 && primaryQty > 0 ? primaryQty / convFact : 0;
           let adjustedSubtotal = newvalue * rate;
 
-          if (
-            name === "productqty" ||
-            name === "rate" ||
-            name === "unitvalue"
-          ) {
+          if (name === "productqty" || name === "rate" || name === "unitvalue") {
             if (discount !== "" && discount > 0) {
               discountAmount = ((adjustedSubtotal * discount) / 100).toFixed(2);
               newFormValues[index]["discount_amount"] = discountAmount;
             } else if (discountAmount !== "" && discountAmount > 0) {
-              discount =
-                adjustedSubtotal > 0
-                  ? ((discountAmount / adjustedSubtotal) * 100).toFixed(2)
-                  : "";
+              discount = adjustedSubtotal > 0 ? ((discountAmount / adjustedSubtotal) * 100).toFixed(2) : "";
               newFormValues[index]["discount"] = discount;
             }
           }
@@ -923,25 +684,15 @@ const ProductSelectionTable = ({
             if (value === "") {
               newFormValues[index]["discount"] = "";
             } else if (discountAmount > 0) {
-              discount =
-                adjustedSubtotal > 0
-                  ? ((discountAmount / adjustedSubtotal) * 100).toFixed(2)
-                  : "";
+              discount = adjustedSubtotal > 0 ? ((discountAmount / adjustedSubtotal) * 100).toFixed(2) : "";
               newFormValues[index]["discount"] = discount;
             }
           }
-          newFormValues[index]["totalrate"] = (
-            adjustedSubtotal -
-            (parseFloat(newFormValues[index]["discount_amount"]) || 0)
-          ).toFixed(2);
+          newFormValues[index]["totalrate"] = (adjustedSubtotal - (parseFloat(newFormValues[index]["discount_amount"]) || 0)).toFixed(2);
         }
       }
-    } else if (
-      selectedtypeOption == "salesorder-option" &&
-      secUnitConfig == "1"
-    ) {
-      const convFact =
-        parseFloat(newFormValues[index]["secondary_base_qty"]) || 0;
+    } else if ((selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") && secUnitConfig == "1") {
+      const convFact = parseFloat(newFormValues[index]["secondary_base_qty"]) || 0;
       const conversionFlg = newFormValues[index]["conversion_flg"];
       const unitConMode = newFormValues[index]["unit_con_mode"] || "1";
       let secondaryQty = parseFloat(newFormValues[index]["SecQtyTotal"]) || 0;
@@ -957,16 +708,10 @@ const ProductSelectionTable = ({
         name === "discount_amount"
       ) {
         if (conversionFlg == "1") {
-          secondaryQty =
-            convFact > 0 && primaryQty > 0
-              ? (primaryQty * convFact).toFixed(2)
-              : "0";
+          secondaryQty = convFact > 0 && primaryQty > 0 ? (primaryQty * convFact).toFixed(2) : "0";
           newFormValues[index]["SecQtyTotal"] = secondaryQty;
         } else if (conversionFlg == "2") {
-          primaryQty =
-            convFact > 0 && secondaryQty > 0
-              ? (secondaryQty / convFact).toFixed(2)
-              : "0";
+          primaryQty = convFact > 0 && secondaryQty > 0 ? (secondaryQty / convFact).toFixed(2) : "0";
           newFormValues[index]["productqty"] = primaryQty;
         }
 
@@ -976,32 +721,16 @@ const ProductSelectionTable = ({
           if (name == "sec_unit_rate" && convFact > 0) {
             newFormValues[index]["rate"] = (secUnitRate * convFact).toFixed(2);
           } else if (name == "rate" && convFact > 0) {
-            newFormValues[index]["sec_unit_rate"] = (rate / convFact).toFixed(
-              2
-            );
+            newFormValues[index]["sec_unit_rate"] = (rate / convFact).toFixed(2);
           }
         } else {
-          if (
-            unitConMode == "3" &&
-            name == "rate" &&
-            conversionFlg == "1" &&
-            convFact > 0
-          ) {
-            newFormValues[index]["sec_unit_rate"] = (rate / convFact).toFixed(
-              2
-            );
-          } else if (
-            unitConMode == "3" &&
-            name == "sec_unit_rate" &&
-            conversionFlg == "1" &&
-            convFact > 0
-          ) {
+          if (unitConMode == "3" && name == "rate" && conversionFlg == "1" && convFact > 0) {
+            newFormValues[index]["sec_unit_rate"] = (rate / convFact).toFixed(2);
+          } else if (unitConMode == "3" && name == "sec_unit_rate" && conversionFlg == "1" && convFact > 0) {
             newFormValues[index]["rate"] = (secUnitRate * convFact).toFixed(2);
           }
           calcSubtotal =
-            conversionFlg == "2" && unitConMode != "3"
-              ? secondaryQty * (rate / convFact)
-              : primaryQty * rate;
+            conversionFlg == "2" && unitConMode != "3" ? secondaryQty * (rate / convFact) : primaryQty * rate;
         }
 
         if (
@@ -1016,10 +745,7 @@ const ProductSelectionTable = ({
             discountAmount = ((calcSubtotal * discount) / 100).toFixed(2);
             newFormValues[index]["discount_amount"] = discountAmount;
           } else if (discountAmount != "" && discountAmount > 0) {
-            discount =
-              calcSubtotal > 0
-                ? ((discountAmount / calcSubtotal) * 100).toFixed(2)
-                : "";
+            discount = calcSubtotal > 0 ? ((discountAmount / calcSubtotal) * 100).toFixed(2) : "";
             newFormValues[index]["discount"] = discount;
           }
         }
@@ -1036,35 +762,21 @@ const ProductSelectionTable = ({
             newFormValues[index]["discount"] = "";
             discount = 0;
           } else if (discountAmount > 0) {
-            discount =
-              calcSubtotal > 0
-                ? ((discountAmount / calcSubtotal) * 100).toFixed(2)
-                : "";
+            discount = calcSubtotal > 0 ? ((discountAmount / calcSubtotal) * 100).toFixed(2) : "";
             newFormValues[index]["discount"] = discount;
           }
         }
-        newFormValues[index]["totalrate"] = (
-          calcSubtotal -
-          (parseFloat(newFormValues[index]["discount_amount"]) || 0)
-        ).toFixed(2);
+        newFormValues[index]["totalrate"] = (calcSubtotal - (parseFloat(newFormValues[index]["discount_amount"]) || 0)).toFixed(2);
       }
     }
 
     if (name === "rate" || name === "productqty" || name === "SecQtyTotal") {
       if (newFormValues[index]["discount"] !== "") {
-        const currentDiscount =
-          parseFloat(newFormValues[index]["discount"]) || 0;
+        const currentDiscount = parseFloat(newFormValues[index]["discount"]) || 0;
         const newSubtotal =
-          parseFloat(newFormValues[index]["totalrate"]) +
-          (parseFloat(newFormValues[index]["discount_amount"]) || 0);
-        newFormValues[index]["discount_amount"] = (
-          (newSubtotal * currentDiscount) /
-          100
-        ).toFixed(2);
-        newFormValues[index]["totalrate"] = (
-          newSubtotal -
-          (newSubtotal * currentDiscount) / 100
-        ).toFixed(2);
+          parseFloat(newFormValues[index]["totalrate"]) + (parseFloat(newFormValues[index]["discount_amount"]) || 0);
+        newFormValues[index]["discount_amount"] = ((newSubtotal * currentDiscount) / 100).toFixed(2);
+        newFormValues[index]["totalrate"] = (newSubtotal - (newSubtotal * currentDiscount) / 100).toFixed(2);
       }
     }
 
@@ -1073,7 +785,7 @@ const ProductSelectionTable = ({
 
   const addFormFields = () => {
     const baseFormValues = {
-      unique_id: generateUniqueId(), // Always set unique_id
+      unique_id: generateUniqueId(),
       productid: "",
       productname: "",
       productqty: "",
@@ -1089,8 +801,7 @@ const ProductSelectionTable = ({
       SecQtyReverseCalculate: "0",
       proddivision: "",
       stock_data: [],
-      // pricelist_data: {},
-      price_list_flg: false, // Added price_list_flg
+      price_list_flg: false,
       Attribute_data: {},
       attribute: {},
       scheduleDate: format(new Date(), "yyyy-MM-dd"),
@@ -1111,7 +822,7 @@ const ProductSelectionTable = ({
     };
 
     const newFormValues =
-      selectedtypeOption == "salesorder-option" && secUnitConfig == "1"
+      (selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") && secUnitConfig == "1"
         ? enhancedFormValues
         : baseFormValues;
 
@@ -1132,11 +843,8 @@ const ProductSelectionTable = ({
         if (oldKey) {
           const [productId, oldIndex] = oldKey.split("_");
           const newKey = `${productId}_${newIndex}`;
-
-          // Create new attribute object with updated key
           const newAttribute = {};
           newAttribute[newKey] = item.attribute[oldKey];
-
           return {
             ...item,
             attribute: newAttribute,
@@ -1163,15 +871,13 @@ const ProductSelectionTable = ({
         unitvalue: "0",
         SecQtyReverseCalculate: "0",
         stock_data: [],
-        // pricelist_data: {},
-        price_list_flg: false, // Added price_list_flg
+        price_list_flg: false,
         Attribute_data: {},
         attribute: {},
         proddivision: "",
-        scheduleDate:
-          selectedtypeOption == "salesorder-option"
-            ? format(new Date(), "yyyy-MM-dd")
-            : undefined,
+        scheduleDate: (selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option")
+          ? format(new Date(), "yyyy-MM-dd")
+          : undefined,
         discount: "",
         discount_amount: "",
         mrp_price: "",
@@ -1189,7 +895,7 @@ const ProductSelectionTable = ({
       };
 
       const defaultForm =
-        selectedtypeOption == "salesorder-option" && secUnitConfig == "1"
+        (selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") && secUnitConfig == "1"
           ? enhancedDefault
           : baseDefault;
 
@@ -1219,92 +925,46 @@ const ProductSelectionTable = ({
         <Table className="min-w-[1400px] table-wide z-10">
           <TableHeader>
             <TableRow className="bg-[#4a5a6b] text-white text-center hover:bg-[#4a5a6b]">
-              <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
-                Action
-              </TableHead>
+              <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">Action</TableHead>
               {companyDetails?.Attribute_Permission && (
-                <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
-                  Attr
-                </TableHead>
+                <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">Attr</TableHead>
               )}
-              {selectedtypeOption == "salesorder-option" && (
-                <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
-                  Price List
-                </TableHead>
+              {(selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") && (
+                <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">Price List</TableHead>
               )}
-              <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
-                Image
-              </TableHead>
-              <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
-                Product
-              </TableHead>
+              <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">Image</TableHead>
+              <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">Product</TableHead>
               {enablestock == "Y" && (
-                <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
-                  Stock
-                </TableHead>
+                <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">Stock</TableHead>
               )}
-              {selectedtypeOption == "salesorder-option" &&
-                secUnitConfig == "1" && (
-                  <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
-                    Conversion
-                  </TableHead>
-                )}
+              {(selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") && secUnitConfig == "1" && (
+                <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">Conversion</TableHead>
+              )}
               {enablepacking == "Y" && (
-                <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
-                  Packing
-                </TableHead>
+                <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">Packing</TableHead>
               )}
-              {(selectedtypeOption == "lead-option" ||
-                secUnitConfig == "0") && (
-                  <>
-                    <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
-                      Unit
-                    </TableHead>
-                    <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
-                      Qty
-                    </TableHead>
-                  </>
-                )}
-              {selectedtypeOption == "salesorder-option" &&
-                secUnitConfig == "1" && (
-                  <>
-                    <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
-                      Primary Qty
-                    </TableHead>
-                    <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
-                      Primary Unit
-                    </TableHead>
-                    <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
-                      Conv. Factor
-                    </TableHead>
-                    <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
-                      Secondary Qty
-                    </TableHead>
-                    <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
-                      Secondary Unit
-                    </TableHead>
-                  </>
-                )}
-
-              <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
-                MRP
-              </TableHead>
-              <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
-                Rate
-              </TableHead>
-              <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
-                Disc (%)
-              </TableHead>
-              <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
-                Disc
-              </TableHead>
-              <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
-                Total
-              </TableHead>
-              {selectedtypeOption == "salesorder-option" && (
-                <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">
-                  Schedule Date
-                </TableHead>
+              {(selectedtypeOption == "lead-option" || secUnitConfig == "0") && (
+                <>
+                  <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">Unit</TableHead>
+                  <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">Qty</TableHead>
+                </>
+              )}
+              {(selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") && secUnitConfig == "1" && (
+                <>
+                  <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">Primary Qty</TableHead>
+                  <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">Primary Unit</TableHead>
+                  <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">Conv. Factor</TableHead>
+                  <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">Secondary Qty</TableHead>
+                  <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">Secondary Unit</TableHead>
+                </>
+              )}
+              <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">MRP</TableHead>
+              <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">Rate</TableHead>
+              <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">Disc (%)</TableHead>
+              <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">Disc</TableHead>
+              <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">Total</TableHead>
+              {(selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") && (
+                <TableHead className="text-white text-sm sm:text-base px-2 sm:px-4 py-2">Schedule Date</TableHead>
               )}
             </TableRow>
           </TableHeader>
@@ -1330,29 +990,22 @@ const ProductSelectionTable = ({
                   <TableCell className="text-left">
                     <div className="flex justify-center items-center">
                       <Tag
-                        className={`${element.productid &&
-                          Object.keys(element.Attribute_data || {}).length > 0
+                        className={`${element.productid && Object.keys(element.Attribute_data || {}).length > 0
                           ? "text-[#26994e] cursor-pointer rotate-90"
                           : "text-gray-400 cursor-not-allowed opacity-50 rotate-90"
                           }`}
                         size={22}
                         onClick={() => {
-                          if (
-                            element.productid &&
-                            Object.keys(element.Attribute_data || {}).length > 0
-                          ) {
+                          if (element.productid && Object.keys(element.Attribute_data || {}).length > 0) {
                             handleShowAttributes(element);
                           }
                         }}
-                        disabled={
-                          !element.productid ||
-                          Object.keys(element.Attribute_data || {}).length === 0
-                        }
+                        disabled={!element.productid || Object.keys(element.Attribute_data || {}).length === 0}
                       />
                     </div>
                   </TableCell>
                 )}
-                {selectedtypeOption == "salesorder-option" && (
+                {(selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") && (
                   <TableCell className="text-left">
                     <div className="flex justify-center items-center">
                       <List
@@ -1366,9 +1019,7 @@ const ProductSelectionTable = ({
                             handleShowPriceList(element);
                           }
                         }}
-                        disabled={
-                          !element.productid || !element?.price_list_flg
-                        }
+                        disabled={!element.productid || !element?.price_list_flg}
                       />
                     </div>
                   </TableCell>
@@ -1385,10 +1036,7 @@ const ProductSelectionTable = ({
                   />
                 </TableCell>
                 <TableCell
-                  className={`text-left ${user?.isEmployee && !selectedContact
-                    ? "opacity-50 pointer-events-none"
-                    : ""
-                    }`}
+                  className={`text-left ${user?.isEmployee && !selectedContact ? "opacity-50 pointer-events-none" : ""}`}
                 >
                   {element.productid ? (
                     <div className="w-[250px]">
@@ -1407,417 +1055,265 @@ const ProductSelectionTable = ({
                   <TableCell className="text-left">
                     <div className="flex justify-center items-center">
                       <Eye
-                        className={`text-[#26994e] ${element.productid
-                          ? "cursor-pointer"
-                          : "cursor-not-allowed opacity-50"
-                          }`}
+                        className={`text-[#26994e] ${element.productid ? "cursor-pointer" : "cursor-not-allowed opacity-50"}`}
                         size={22}
-                        onClick={() =>
-                          element.productid && handleShowStock(element)
-                        }
+                        onClick={() => element.productid && handleShowStock(element)}
                         disabled={!element.productid}
                       />
                     </div>
                   </TableCell>
                 )}
-                {selectedtypeOption == "salesorder-option" &&
-                  secUnitConfig == "1" && (
-                    <TableCell className="text-left">
-                      <Select
-                        value={element.conversion_flg || "1"}
-                        onValueChange={(value) =>
-                          handleChange(index, {
-                            target: { name: "conversion_flg", value },
-                          })
-                        }
-                        disabled={!element.productid}
+                {(selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") && secUnitConfig == "1" && (
+                  <TableCell className="text-left">
+                    <Select
+                      value={element.conversion_flg || "1"}
+                      onValueChange={(value) => handleChange(index, { target: { name: "conversion_flg", value } })}
+                      disabled={!element.productid}
+                    >
+                      <SelectTrigger
+                        className={`input-focus-style w-[100px] ${!element.productid ? "bg-gray-300" : "bg-white"}`}
                       >
-                        <SelectTrigger
-                          className={`input-focus-style w-[100px] ${!element.productid ? "bg-gray-300" : "bg-white"
-                            }`}
-                        >
-                          <SelectValue placeholder="Select Conversion" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1">
-                            {element.primary_unit_id &&
-                              unitMaster.find(
-                                (unit) => unit.unit_id == element.primary_unit_id
-                              ) ? (
-                              <>
-                                {
-                                  unitMaster.find(
-                                    (unit) =>
-                                      unit.unit_id == element.primary_unit_id
-                                  ).unit_name
-                                }
-                                {unitMaster.find(
-                                  (unit) =>
-                                    unit.unit_id == element.primary_unit_id
-                                ).unit_symbol &&
-                                  ` (${unitMaster.find(
-                                    (unit) =>
-                                      unit.unit_id == element.primary_unit_id
-                                  ).unit_symbol
-                                  })`}
-                              </>
-                            ) : element.unit &&
-                              unitMaster.find(
-                                (unit) =>
-                                  unit.unit_name.toLowerCase() ==
-                                  element.unit.toLowerCase()
-                              ) ? (
-                              <>
-                                {
-                                  unitMaster.find(
-                                    (unit) =>
-                                      unit.unit_name.toLowerCase() ==
-                                      element.unit.toLowerCase()
-                                  ).unit_name
-                                }
-                                {unitMaster.find(
-                                  (unit) =>
-                                    unit.unit_name.toLowerCase() ==
-                                    element.unit.toLowerCase()
-                                ).unit_symbol &&
-                                  ` (${unitMaster.find(
-                                    (unit) =>
-                                      unit.unit_name.toLowerCase() ==
-                                      element.unit.toLowerCase()
-                                  ).unit_symbol
-                                  })`}
-                              </>
-                            ) : (
-                              ""
-                            )}
-                          </SelectItem>
-                          <SelectItem value="2">
-                            {element.secondary_unit_id &&
-                              unitMaster.find(
-                                (unit) =>
-                                  unit.unit_id == element.secondary_unit_id
-                              ) ? (
-                              <>
-                                {
-                                  unitMaster.find(
-                                    (unit) =>
-                                      unit.unit_id == element.secondary_unit_id
-                                  ).unit_name
-                                }
-                                {unitMaster.find(
-                                  (unit) =>
-                                    unit.unit_id == element.secondary_unit_id
-                                ).unit_symbol &&
-                                  ` (${unitMaster.find(
-                                    (unit) =>
-                                      unit.unit_id ==
-                                      element.secondary_unit_id
-                                  ).unit_symbol
-                                  })`}
-                              </>
-                            ) : element.sec_unit &&
-                              unitMaster.find(
-                                (unit) =>
-                                  unit.unit_name.toLowerCase() ==
-                                  element.sec_unit.toLowerCase()
-                              ) ? (
-                              <>
-                                {
-                                  unitMaster.find(
-                                    (unit) =>
-                                      unit.unit_name.toLowerCase() ==
-                                      element.sec_unit.toLowerCase()
-                                  ).unit_name
-                                }
-                                {unitMaster.find(
-                                  (unit) =>
-                                    unit.unit_name.toLowerCase() ==
-                                    element.sec_unit.toLowerCase()
-                                ).unit_symbol &&
-                                  ` (${unitMaster.find(
-                                    (unit) =>
-                                      unit.unit_name.toLowerCase() ==
-                                      element.sec_unit.toLowerCase()
-                                  ).unit_symbol
-                                  })`}
-                              </>
-                            ) : (
-                              ""
-                            )}
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                  )}
+                        <SelectValue placeholder="Select Conversion" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">
+                          {element.primary_unit_id &&
+                            unitMaster.find((unit) => unit.unit_id == element.primary_unit_id) ? (
+                            <>
+                              {unitMaster.find((unit) => unit.unit_id == element.primary_unit_id).unit_name}
+                              {unitMaster.find((unit) => unit.unit_id == element.primary_unit_id).unit_symbol &&
+                                ` (${unitMaster.find((unit) => unit.unit_id == element.primary_unit_id).unit_symbol})`}
+                            </>
+                          ) : element.unit &&
+                            unitMaster.find((unit) => unit.unit_name.toLowerCase() == element.unit.toLowerCase()) ? (
+                            <>
+                              {unitMaster.find((unit) => unit.unit_name.toLowerCase() == element.unit.toLowerCase()).unit_name}
+                              {unitMaster.find((unit) => unit.unit_name.toLowerCase() == element.unit.toLowerCase()).unit_symbol &&
+                                ` (${unitMaster.find((unit) => unit.unit_name.toLowerCase() == element.unit.toLowerCase()).unit_symbol})`}
+                            </>
+                          ) : (
+                            ""
+                          )}
+                        </SelectItem>
+                        <SelectItem value="2">
+                          {element.secondary_unit_id &&
+                            unitMaster.find((unit) => unit.unit_id == element.secondary_unit_id) ? (
+                            <>
+                              {unitMaster.find((unit) => unit.unit_id == element.secondary_unit_id).unit_name}
+                              {unitMaster.find((unit) => unit.unit_id == element.secondary_unit_id).unit_symbol &&
+                                ` (${unitMaster.find((unit) => unit.unit_id == element.secondary_unit_id).unit_symbol})`}
+                            </>
+                          ) : element.sec_unit &&
+                            unitMaster.find((unit) => unit.unit_name.toLowerCase() == element.sec_unit.toLowerCase()) ? (
+                            <>
+                              {unitMaster.find((unit) => unit.unit_name.toLowerCase() == element.sec_unit.toLowerCase()).unit_name}
+                              {unitMaster.find((unit) => unit.unit_name.toLowerCase() == element.sec_unit.toLowerCase()).unit_symbol &&
+                                ` (${unitMaster.find((unit) => unit.unit_name.toLowerCase() == element.sec_unit.toLowerCase()).unit_symbol})`}
+                            </>
+                          ) : (
+                            ""
+                          )}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                )}
                 {enablepacking == "Y" && (
                   <TableCell className="text-left">
                     <span className="">{element.proddivision || "0"}</span>
                   </TableCell>
                 )}
-                {(selectedtypeOption == "lead-option" ||
-                  secUnitConfig == "0") && (
-                    <>
-                      <TableCell className="text-left">
+                {(selectedtypeOption == "lead-option" || secUnitConfig == "0") && (
+                  <>
+                    <TableCell className="text-left">
+                      <Select
+                        value={element.unitvalue || "0"}
+                        onValueChange={(value) => handleChange(index, { target: { name: "unitvalue", value } })}
+                        disabled={!element.productid}
+                      >
+                        <SelectTrigger className="input-focus-style w-[100px]">
+                          <SelectValue placeholder="Select Unit" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {element.unit && <SelectItem value="0">{element.unit}</SelectItem>}
+                          {secUnitConfig == "1" && element.sec_unit && (
+                            <SelectItem value="1">{element.sec_unit}</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell className="text-left">
+                      <Input
+                        type="text"
+                        className="input-focus-style w-[100px]"
+                        name="productqty"
+                        value={element.productqty || ""}
+                        onChange={(e) => handleChange(index, e)}
+                        onKeyDown={handleKeyDown}
+                        disabled={!element.productid}
+                      />
+                    </TableCell>
+                  </>
+                )}
+                {(selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") && secUnitConfig == "1" && (
+                  <>
+                    <TableCell className="text-left">
+                      <Input
+                        type="text"
+                        className={`input-focus-style w-[80px] ${!element.productid || element.conversion_flg == "2" ? "bg-gray-300" : "bg-white"
+                          }`}
+                        name="productqty"
+                        value={element.productqty || ""}
+                        onChange={(e) => handleChange(index, e)}
+                        onKeyDown={handleKeyDown}
+                        disabled={!element.productid || element.conversion_flg == "2"}
+                      />
+                    </TableCell>
+                    <TableCell className="text-left">
+                      {element.primary_unit_id && unitMaster.find((unit) => unit.unit_id == element.primary_unit_id) ? (
+                        <span className="">
+                          {(() => {
+                            const selectedUnit = unitMaster.find((unit) => unit.unit_id == element.primary_unit_id);
+                            return (
+                              <>
+                                {selectedUnit.unit_name}
+                                {selectedUnit.unit_symbol && ` (${selectedUnit.unit_symbol})`}
+                              </>
+                            );
+                          })()}
+                        </span>
+                      ) : element.unit &&
+                        unitMaster.find((unit) => unit.unit_name.toLowerCase() == element.unit.toLowerCase()) ? (
+                        <span className="">
+                          {(() => {
+                            const selectedUnit = unitMaster.find(
+                              (unit) => unit.unit_name.toLowerCase() == element.unit.toLowerCase()
+                            );
+                            return (
+                              <>
+                                {selectedUnit.unit_name}
+                                {selectedUnit.unit_symbol && ` (${selectedUnit.unit_symbol})`}
+                              </>
+                            );
+                          })()}
+                        </span>
+                      ) : (
                         <Select
-                          value={element.unitvalue || "0"}
-                          onValueChange={(value) =>
-                            handleChange(index, {
-                              target: { name: "unitvalue", value },
-                            })
-                          }
+                          value={element.primary_unit_id || ""}
+                          onValueChange={(value) => handleChange(index, { target: { name: "primary_unit_id", value } })}
                           disabled={!element.productid}
                         >
-                          <SelectTrigger className="input-focus-style w-[100px]">
-                            <SelectValue placeholder="Select Unit" />
+                          <SelectTrigger
+                            className={`input-focus-style w-[100px] ${!element.productid ? "bg-gray-300" : "bg-white"}`}
+                          >
+                            <SelectValue placeholder="Select Primary Unit" />
                           </SelectTrigger>
                           <SelectContent>
-                            {element.unit && (
-                              <SelectItem value="0">{element.unit}</SelectItem>
-                            )}
-                            {secUnitConfig == "1" && element.sec_unit && (
-                              <SelectItem value="1">
-                                {element.sec_unit}
+                            {unitMaster.map((unit) => (
+                              <SelectItem key={unit.unit_id} value={unit.unit_id}>
+                                {unit.unit_name}
+                                {unit.unit_symbol && ` (${unit.unit_symbol})`}
                               </SelectItem>
-                            )}
+                            ))}
                           </SelectContent>
                         </Select>
-                      </TableCell>
-                      <TableCell className="text-left">
-                        <Input
-                          type="text"
-                          className="input-focus-style w-[100px]"
-                          name="productqty"
-                          value={element.productqty || ""}
-                          onChange={(e) => handleChange(index, e)}
-                          onKeyDown={handleKeyDown}
+                      )}
+                    </TableCell>
+                    <TableCell className="text-left">
+                      <Input
+                        type="text"
+                        className="input-focus-style w-[80px] bg-gray-300"
+                        name="secondary_base_qty"
+                        value={element.secondary_base_qty || ""}
+                        onChange={(e) => handleChange(index, e)}
+                        onKeyDown={handleKeyDown}
+                        disabled={true}
+                      />
+                    </TableCell>
+                    <TableCell className="text-left">
+                      <Input
+                        type="text"
+                        className={`input-focus-style w-[100px] ${!element.productid || element.conversion_flg == "1" ? "bg-gray-300" : "bg-white"
+                          }`}
+                        name="SecQtyTotal"
+                        value={element.SecQtyTotal || ""}
+                        onChange={(e) => handleChange(index, e)}
+                        onKeyDown={handleKeyDown}
+                        disabled={!element.productid || element.conversion_flg == "1"}
+                      />
+                    </TableCell>
+                    <TableCell className="text-left">
+                      {element.secondary_unit_id && unitMaster.find((unit) => unit.unit_id == element.secondary_unit_id) ? (
+                        <span className="">
+                          {(() => {
+                            const selectedUnit = unitMaster.find((unit) => unit.unit_id == element.secondary_unit_id);
+                            return (
+                              <>
+                                {selectedUnit.unit_name}
+                                {selectedUnit.unit_symbol && ` (${selectedUnit.unit_symbol})`}
+                              </>
+                            );
+                          })()}
+                        </span>
+                      ) : element.sec_unit &&
+                        unitMaster.find((unit) => unit.unit_name.toLowerCase() == element.sec_unit.toLowerCase()) ? (
+                        <span className="">
+                          {(() => {
+                            const selectedUnit = unitMaster.find(
+                              (unit) => unit.unit_name.toLowerCase() == element.sec_unit.toLowerCase()
+                            );
+                            return (
+                              <>
+                                {selectedUnit.unit_name}
+                                {selectedUnit.unit_symbol && ` (${selectedUnit.unit_symbol})`}
+                              </>
+                            );
+                          })()}
+                        </span>
+                      ) : (
+                        <Select
+                          value={element.secondary_unit_id || ""}
+                          onValueChange={(value) => handleChange(index, { target: { name: "secondary_unit_id", value } })}
                           disabled={!element.productid}
-                        />
-                      </TableCell>
-                    </>
-                  )}
-                {selectedtypeOption == "salesorder-option" &&
-                  secUnitConfig == "1" && (
-                    <>
-                      <TableCell className="text-left">
-                        <Input
-                          type="text"
-                          className={`input-focus-style w-[80px] ${!element.productid || element.conversion_flg == "2"
-                            ? "bg-gray-300"
-                            : "bg-white"
-                            }`}
-                          name="productqty"
-                          value={element.productqty || ""}
-                          onChange={(e) => handleChange(index, e)}
-                          onKeyDown={handleKeyDown}
-                          disabled={
-                            !element.productid || element.conversion_flg == "2"
-                          }
-                        />
-                      </TableCell>
-                      <TableCell className="text-left">
-                        {element.primary_unit_id &&
-                          unitMaster.find(
-                            (unit) => unit.unit_id == element.primary_unit_id
-                          ) ? (
-                          <span className="">
-                            {(() => {
-                              const selectedUnit = unitMaster.find(
-                                (unit) =>
-                                  unit.unit_id == element.primary_unit_id
-                              );
-                              return (
-                                <>
-                                  {selectedUnit.unit_name}
-                                  {selectedUnit.unit_symbol &&
-                                    ` (${selectedUnit.unit_symbol})`}
-                                </>
-                              );
-                            })()}
-                          </span>
-                        ) : element.unit &&
-                          unitMaster.find(
-                            (unit) =>
-                              unit.unit_name.toLowerCase() ==
-                              element.unit.toLowerCase()
-                          ) ? (
-                          <span className="">
-                            {(() => {
-                              const selectedUnit = unitMaster.find(
-                                (unit) =>
-                                  unit.unit_name.toLowerCase() ==
-                                  element.unit.toLowerCase()
-                              );
-                              return (
-                                <>
-                                  {selectedUnit.unit_name}
-                                  {selectedUnit.unit_symbol &&
-                                    ` (${selectedUnit.unit_symbol})`}
-                                </>
-                              );
-                            })()}
-                          </span>
-                        ) : (
-                          <Select
-                            value={element.primary_unit_id || ""}
-                            onValueChange={(value) =>
-                              handleChange(index, {
-                                target: { name: "primary_unit_id", value },
-                              })
-                            }
-                            disabled={!element.productid}
+                        >
+                          <SelectTrigger
+                            className={`input-focus-style w-[100px] ${!element.productid ? "bg-gray-300" : "bg-white"}`}
                           >
-                            <SelectTrigger
-                              className={`input-focus-style w-[100px] ${!element.productid ? "bg-gray-300" : "bg-white"
-                                }`}
-                            >
-                              <SelectValue placeholder="Select Primary Unit" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {unitMaster.map((unit) => (
-                                <SelectItem
-                                  key={unit.unit_id}
-                                  value={unit.unit_id}
-                                >
-                                  {unit.unit_name}
-                                  {unit.unit_symbol && ` (${unit.unit_symbol})`}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-left">
-                        <Input
-                          type="text"
-                          className="input-focus-style w-[80px] bg-gray-300"
-                          name="secondary_base_qty"
-                          value={element.secondary_base_qty || ""}
-                          onChange={(e) => handleChange(index, e)}
-                          onKeyDown={handleKeyDown}
-                          disabled={true}
-                        />
-                      </TableCell>
-                      <TableCell className="text-left">
-                        <Input
-                          type="text"
-                          className={`input-focus-style w-[100px] ${!element.productid || element.conversion_flg == "1"
-                            ? "bg-gray-300"
-                            : "bg-white"
-                            }`}
-                          name="SecQtyTotal"
-                          value={element.SecQtyTotal || ""}
-                          onChange={(e) => handleChange(index, e)}
-                          onKeyDown={handleKeyDown}
-                          disabled={
-                            !element.productid || element.conversion_flg == "1"
-                          }
-                        />
-                      </TableCell>
-                      <TableCell className="text-left">
-                        {element.secondary_unit_id &&
-                          unitMaster.find(
-                            (unit) => unit.unit_id == element.secondary_unit_id
-                          ) ? (
-                          <span className="">
-                            {(() => {
-                              const selectedUnit = unitMaster.find(
-                                (unit) =>
-                                  unit.unit_id == element.secondary_unit_id
-                              );
-                              return (
-                                <>
-                                  {selectedUnit.unit_name}
-                                  {selectedUnit.unit_symbol &&
-                                    ` (${selectedUnit.unit_symbol})`}
-                                </>
-                              );
-                            })()}
-                          </span>
-                        ) : element.sec_unit &&
-                          unitMaster.find(
-                            (unit) =>
-                              unit.unit_name.toLowerCase() ==
-                              element.sec_unit.toLowerCase()
-                          ) ? (
-                          <span className="">
-                            {(() => {
-                              const selectedUnit = unitMaster.find(
-                                (unit) =>
-                                  unit.unit_name.toLowerCase() ==
-                                  element.sec_unit.toLowerCase()
-                              );
-                              return (
-                                <>
-                                  {selectedUnit.unit_name}
-                                  {selectedUnit.unit_symbol &&
-                                    ` (${selectedUnit.unit_symbol})`}
-                                </>
-                              );
-                            })()}
-                          </span>
-                        ) : (
-                          <Select
-                            value={element.secondary_unit_id || ""}
-                            onValueChange={(value) =>
-                              handleChange(index, {
-                                target: { name: "secondary_unit_id", value },
-                              })
-                            }
-                            disabled={!element.productid}
-                          >
-                            <SelectTrigger
-                              className={`input-focus-style w-[100px] ${!element.productid ? "bg-gray-300" : "bg-white"
-                                }`}
-                            >
-                              <SelectValue placeholder="Select Secondary Unit" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {unitMaster.map((unit) => (
-                                <SelectItem
-                                  key={unit.unit_id}
-                                  value={unit.unit_id}
-                                >
-                                  {unit.unit_name}
-                                  {unit.unit_symbol && ` (${unit.unit_symbol})`}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      </TableCell>
-                    </>
-                  )}
-
+                            <SelectValue placeholder="Select Secondary Unit" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {unitMaster.map((unit) => (
+                              <SelectItem key={unit.unit_id} value={unit.unit_id}>
+                                {unit.unit_name}
+                                {unit.unit_symbol && ` (${unit.unit_symbol})`}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </TableCell>
+                  </>
+                )}
                 <TableCell className="text-left">
-                  {/* <span className="">
-                    {!isNaN(parseFloat(element.mrp_price))
-                      ? parseFloat(element.mrp_price).toFixed(2)
-                      : "0.00"}
-                  </span> */}
                   <span className="">
-                    {
-                      selectedtypeOption == "salesorder-option" &&
-                        secUnitConfig == "1" &&
-                        element.unit_con_mode == "3" &&
-                        element.conversion_flg == "2"
-                        ? !isNaN(parseFloat(element.sec_unit_mrp_rate))
-                          ? parseFloat(element.sec_unit_mrp_rate).toFixed(2)
-                          : "0.00"
-                        : !isNaN(parseFloat(element.mrp_price))
-                          ? parseFloat(element.mrp_price).toFixed(2)
-                          : "0.00"
-                    }
+                    {(selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") &&
+                      secUnitConfig == "1" &&
+                      element.unit_con_mode == "3" &&
+                      element.conversion_flg == "2"
+                      ? !isNaN(parseFloat(element.sec_unit_mrp_rate))
+                        ? parseFloat(element.sec_unit_mrp_rate).toFixed(2)
+                        : "0.00"
+                      : !isNaN(parseFloat(element.mrp_price))
+                        ? parseFloat(element.mrp_price).toFixed(2)
+                        : "0.00"}
                   </span>
                 </TableCell>
                 <TableCell className="text-left">
                   <Input
                     type="text"
-                    className={`input-focus-style w-[100px] ${!element.productid || !user?.isEmployee
-                      ? "bg-gray-300"
-                      : "bg-white"
-                      }`}
+                    className={`input-focus-style w-[100px] ${!element.productid || !user?.isEmployee ? "bg-gray-300" : "bg-white"}`}
                     name={
-                      selectedtypeOption == "salesorder-option" &&
+                      (selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") &&
                         secUnitConfig == "1" &&
                         element.unit_con_mode == "3" &&
                         element.conversion_flg == "2"
@@ -1825,7 +1321,7 @@ const ProductSelectionTable = ({
                         : "rate"
                     }
                     value={
-                      selectedtypeOption == "salesorder-option" &&
+                      (selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") &&
                         secUnitConfig == "1" &&
                         element.unit_con_mode == "3" &&
                         element.conversion_flg == "2"
@@ -1840,10 +1336,7 @@ const ProductSelectionTable = ({
                 <TableCell className="text-left">
                   <Input
                     type="text"
-                    className={`input-focus-style w-[80px] ${!element.productid || !user?.isEmployee
-                      ? "bg-gray-300"
-                      : "bg-white"
-                      }`}
+                    className={`input-focus-style w-[80px] ${!element.productid || !user?.isEmployee ? "bg-gray-300" : "bg-white"}`}
                     name="discount"
                     value={element.discount || ""}
                     onChange={(e) => handleChange(index, e)}
@@ -1854,10 +1347,7 @@ const ProductSelectionTable = ({
                 <TableCell className="text-left">
                   <Input
                     type="text"
-                    className={`input-focus-style w-[100px] ${!element.productid || !user?.isEmployee
-                      ? "bg-gray-300"
-                      : "bg-white"
-                      }`}
+                    className={`input-focus-style w-[100px] ${!element.productid || !user?.isEmployee ? "bg-gray-300" : "bg-white"}`}
                     name="discount_amount"
                     value={element.discount_amount || ""}
                     onChange={(e) => handleChange(index, e)}
@@ -1867,12 +1357,10 @@ const ProductSelectionTable = ({
                 </TableCell>
                 <TableCell className="text-left">
                   <span className="">
-                    {element.totalrate > 0
-                      ? parseFloat(element.totalrate).toFixed(2)
-                      : "0.00"}
+                    {element.totalrate > 0 ? parseFloat(element.totalrate).toFixed(2) : "0.00"}
                   </span>
                 </TableCell>
-                {selectedtypeOption == "salesorder-option" && (
+                {(selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") && (
                   <TableCell className="text-left">
                     <Input
                       type="date"
@@ -1893,10 +1381,7 @@ const ProductSelectionTable = ({
       {/* Mobile View */}
       <div className="md:hidden space-y-4 mb-4">
         {formValues.map((element, index) => (
-          <div
-            key={element.unique_id}
-            className="border rounded-lg p-4 bg-white shadow-sm"
-          >
+          <div key={element.unique_id} className="border rounded-lg p-4 bg-white shadow-sm">
             <div className="grid grid-cols-1 gap-4 mb-3">
               <div className="flex justify-end">
                 <Trash2
@@ -1914,38 +1399,27 @@ const ProductSelectionTable = ({
               <div className="space-y-2">
                 {companyDetails?.Attribute_Permission && (
                   <div className="flex items-center">
-                    <label className="text-sm font-medium text-gray-500 w-32">
-                      Attributes:
-                    </label>
+                    <label className="text-sm font-medium text-gray-500 w-32">Attributes:</label>
                     <div className="flex items-center">
                       <Tag
-                        className={`${element.productid &&
-                          Object.keys(element.Attribute_data || {}).length > 0
+                        className={`${element.productid && Object.keys(element.Attribute_data || {}).length > 0
                           ? "text-[#26994e] cursor-pointer rotate-90"
                           : "text-gray-400 cursor-not-allowed opacity-50 rotate-90"
                           }`}
                         size={22}
                         onClick={() => {
-                          if (
-                            element.productid &&
-                            Object.keys(element.Attribute_data || {}).length > 0
-                          ) {
+                          if (element.productid && Object.keys(element.Attribute_data || {}).length > 0) {
                             handleShowAttributes(element);
                           }
                         }}
-                        disabled={
-                          !element.productid ||
-                          Object.keys(element.Attribute_data || {}).length === 0
-                        }
+                        disabled={!element.productid || Object.keys(element.Attribute_data || {}).length === 0}
                       />
                     </div>
                   </div>
                 )}
-                {selectedtypeOption == "salesorder-option" && (
+                {(selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") && (
                   <div className="flex items-center">
-                    <label className="text-sm font-medium text-gray-500 w-32">
-                      Price List:
-                    </label>
+                    <label className="text-sm font-medium text-gray-500 w-32">Price List:</label>
                     <div className="flex items-center">
                       <List
                         className={`${element.productid && element?.price_list_flg
@@ -1958,17 +1432,13 @@ const ProductSelectionTable = ({
                             handleShowPriceList(element);
                           }
                         }}
-                        disabled={
-                          !element.productid || !element?.price_list_flg
-                        }
+                        disabled={!element.productid || !element?.price_list_flg}
                       />
                     </div>
                   </div>
                 )}
                 <div className="flex items-center">
-                  <label className="text-sm font-medium text-gray-500 w-32">
-                    Image:
-                  </label>
+                  <label className="text-sm font-medium text-gray-500 w-32">Image:</label>
                   <img
                     alt="product-image"
                     src={
@@ -1979,21 +1449,15 @@ const ProductSelectionTable = ({
                     className="w-12 h-12"
                   />
                 </div>
-
                 <div
-                  className={`${user?.isEmployee && !selectedContact
-                    ? "opacity-50 pointer-events-none"
-                    : ""
-                    } ${element.productid ? "flex items-center" : ""}`}
+                  className={`${user?.isEmployee && !selectedContact ? "opacity-50 pointer-events-none" : ""} ${element.productid ? "flex items-center" : ""
+                    }`}
                 >
-                  <label className="text-sm font-medium text-gray-500 w-32">
-                    Product:
-                  </label>
+                  <label className="text-sm font-medium text-gray-500 w-32">Product:</label>
                   {element.productid ? (
                     <div className="flex items-center">
                       <span className="text-sm flex-1">
-                        {element.productname || ""} ({element.productcode || ""}
-                        )
+                        {element.productname || ""} ({element.productcode || ""})
                       </span>
                     </div>
                   ) : (
@@ -2006,458 +1470,279 @@ const ProductSelectionTable = ({
                 </div>
                 {enablestock == "Y" && (
                   <div className="flex items-center">
-                    <label className="text-sm font-medium text-gray-500 w-32">
-                      Stock:
-                    </label>
+                    <label className="text-sm font-medium text-gray-500 w-32">Stock:</label>
                     <div className="flex items-center">
                       <Eye
-                        className={`text-[#26994e] ${element.productid
-                          ? "cursor-pointer"
-                          : "cursor-not-allowed opacity-50"
-                          }`}
+                        className={`text-[#26994e] ${element.productid ? "cursor-pointer" : "cursor-not-allowed opacity-50"}`}
                         size={22}
-                        onClick={() =>
-                          element.productid && handleShowStock(element)
-                        }
+                        onClick={() => element.productid && handleShowStock(element)}
                         disabled={!element.productid}
                       />
                     </div>
                   </div>
                 )}
-                {selectedtypeOption == "salesorder-option" &&
-                  secUnitConfig == "1" && (
+                {(selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") && secUnitConfig == "1" && (
+                  <div className="flex items-center">
+                    <label className="text-sm font-medium text-gray-500 w-32">Conversion:</label>
+                    <Select
+                      value={element.conversion_flg || "1"}
+                      onValueChange={(value) => handleChange(index, { target: { name: "conversion_flg", value } })}
+                      disabled={!element.productid}
+                    >
+                      <SelectTrigger
+                        className={`input-focus-style w-full max-w-[150px] ${!element.productid ? "bg-gray-300" : "bg-white"}`}
+                      >
+                        <SelectValue placeholder="Select Conversion" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">
+                          {element.primary_unit_id &&
+                            unitMaster.find((unit) => unit.unit_id == element.primary_unit_id) ? (
+                            <>
+                              {unitMaster.find((unit) => unit.unit_id == element.primary_unit_id).unit_name}
+                              {unitMaster.find((unit) => unit.unit_id == element.primary_unit_id).unit_symbol &&
+                                ` (${unitMaster.find((unit) => unit.unit_id == element.primary_unit_id).unit_symbol})`}
+                            </>
+                          ) : element.unit &&
+                            unitMaster.find((unit) => unit.unit_name.toLowerCase() == element.unit.toLowerCase()) ? (
+                            <>
+                              {unitMaster.find((unit) => unit.unit_name.toLowerCase() == element.unit.toLowerCase()).unit_name}
+                              {unitMaster.find((unit) => unit.unit_name.toLowerCase() == element.unit.toLowerCase()).unit_symbol &&
+                                ` (${unitMaster.find((unit) => unit.unit_name.toLowerCase() == element.unit.toLowerCase()).unit_symbol})`}
+                            </>
+                          ) : (
+                            ""
+                          )}
+                        </SelectItem>
+                        <SelectItem value="2">
+                          {element.secondary_unit_id &&
+                            unitMaster.find((unit) => unit.unit_id == element.secondary_unit_id) ? (
+                            <>
+                              {unitMaster.find((unit) => unit.unit_id == element.secondary_unit_id).unit_name}
+                              {unitMaster.find((unit) => unit.unit_id == element.secondary_unit_id).unit_symbol &&
+                                ` (${unitMaster.find((unit) => unit.unit_id == element.secondary_unit_id).unit_symbol})`}
+                            </>
+                          ) : element.sec_unit &&
+                            unitMaster.find((unit) => unit.unit_name.toLowerCase() == element.sec_unit.toLowerCase()) ? (
+                            <>
+                              {unitMaster.find((unit) => unit.unit_name.toLowerCase() == element.sec_unit.toLowerCase()).unit_name}
+                              {unitMaster.find((unit) => unit.unit_name.toLowerCase() == element.sec_unit.toLowerCase()).unit_symbol &&
+                                ` (${unitMaster.find((unit) => unit.unit_name.toLowerCase() == element.sec_unit.toLowerCase()).unit_symbol})`}
+                            </>
+                          ) : (
+                            ""
+                          )}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                {enablepacking == "Y" && (
+                  <div className="flex items-center">
+                    <label className="text-sm font-medium text-gray-500 w-32">Packing:</label>
+                    <span className="text-sm">{element.proddivision || "0"}</span>
+                  </div>
+                )}
+                {(selectedtypeOption == "lead-option" || secUnitConfig == "0") && (
+                  <>
                     <div className="flex items-center">
-                      <label className="text-sm font-medium text-gray-500 w-32">
-                        Conversion:
-                      </label>
+                      <label className="text-sm font-medium text-gray-500 w-32">Unit:</label>
                       <Select
-                        value={element.conversion_flg || "1"}
-                        onValueChange={(value) =>
-                          handleChange(index, {
-                            target: { name: "conversion_flg", value },
-                          })
-                        }
+                        value={element.unitvalue || "0"}
+                        onValueChange={(value) => handleChange(index, { target: { name: "unitvalue", value } })}
                         disabled={!element.productid}
                       >
-                        <SelectTrigger
-                          className={`input-focus-style w-full max-w-[150px] ${!element.productid ? "bg-gray-300" : "bg-white"
-                            }`}
-                        >
-                          <SelectValue placeholder="Select Conversion" />
+                        <SelectTrigger className="input-focus-style w-full max-w-[150px]">
+                          <SelectValue placeholder="Select Unit" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="1">
-                            {element.primary_unit_id &&
-                              unitMaster.find(
-                                (unit) => unit.unit_id == element.primary_unit_id
-                              ) ? (
-                              <>
-                                {
-                                  unitMaster.find(
-                                    (unit) =>
-                                      unit.unit_id == element.primary_unit_id
-                                  ).unit_name
-                                }
-                                {unitMaster.find(
-                                  (unit) =>
-                                    unit.unit_id == element.primary_unit_id
-                                ).unit_symbol &&
-                                  ` (${unitMaster.find(
-                                    (unit) =>
-                                      unit.unit_id == element.primary_unit_id
-                                  ).unit_symbol
-                                  })`}
-                              </>
-                            ) : element.unit &&
-                              unitMaster.find(
-                                (unit) =>
-                                  unit.unit_name.toLowerCase() ==
-                                  element.unit.toLowerCase()
-                              ) ? (
-                              <>
-                                {
-                                  unitMaster.find(
-                                    (unit) =>
-                                      unit.unit_name.toLowerCase() ==
-                                      element.unit.toLowerCase()
-                                  ).unit_name
-                                }
-                                {unitMaster.find(
-                                  (unit) =>
-                                    unit.unit_name.toLowerCase() ==
-                                    element.unit.toLowerCase()
-                                ).unit_symbol &&
-                                  ` (${unitMaster.find(
-                                    (unit) =>
-                                      unit.unit_name.toLowerCase() ==
-                                      element.unit.toLowerCase()
-                                  ).unit_symbol
-                                  })`}
-                              </>
-                            ) : (
-                              ""
-                            )}
-                          </SelectItem>
-                          <SelectItem value="2">
-                            {element.secondary_unit_id &&
-                              unitMaster.find(
-                                (unit) =>
-                                  unit.unit_id == element.secondary_unit_id
-                              ) ? (
-                              <>
-                                {
-                                  unitMaster.find(
-                                    (unit) =>
-                                      unit.unit_id == element.secondary_unit_id
-                                  ).unit_name
-                                }
-                                {unitMaster.find(
-                                  (unit) =>
-                                    unit.unit_id == element.secondary_unit_id
-                                ).unit_symbol &&
-                                  ` (${unitMaster.find(
-                                    (unit) =>
-                                      unit.unit_id ==
-                                      element.secondary_unit_id
-                                  ).unit_symbol
-                                  })`}
-                              </>
-                            ) : element.sec_unit &&
-                              unitMaster.find(
-                                (unit) =>
-                                  unit.unit_name.toLowerCase() ==
-                                  element.sec_unit.toLowerCase()
-                              ) ? (
-                              <>
-                                {
-                                  unitMaster.find(
-                                    (unit) =>
-                                      unit.unit_name.toLowerCase() ==
-                                      element.sec_unit.toLowerCase()
-                                  ).unit_name
-                                }
-                                {unitMaster.find(
-                                  (unit) =>
-                                    unit.unit_name.toLowerCase() ==
-                                    element.sec_unit.toLowerCase()
-                                ).unit_symbol &&
-                                  ` (${unitMaster.find(
-                                    (unit) =>
-                                      unit.unit_name.toLowerCase() ==
-                                      element.sec_unit.toLowerCase()
-                                  ).unit_symbol
-                                  })`}
-                              </>
-                            ) : (
-                              ""
-                            )}
-                          </SelectItem>
+                          {element.unit && <SelectItem value="0">{element.unit}</SelectItem>}
+                          {secUnitConfig == "1" && element.sec_unit && (
+                            <SelectItem value="1">{element.sec_unit}</SelectItem>
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
-                  )}
-                {enablepacking == "Y" && (
-                  <div className="flex items-center">
-                    <label className="text-sm font-medium text-gray-500 w-32">
-                      Packing:
-                    </label>
-                    <span className="text-sm">
-                      {element.proddivision || "0"}
-                    </span>
-                  </div>
+                    <div className="flex items-center">
+                      <label className="text-sm font-medium text-gray-500 w-32">Qty:</label>
+                      <Input
+                        type="text"
+                        className="input-focus-style w-full max-w-[150px]"
+                        name="productqty"
+                        value={element.productqty || ""}
+                        onChange={(e) => handleChange(index, e)}
+                        onKeyDown={handleKeyDown}
+                        disabled={!element.productid}
+                      />
+                    </div>
+                  </>
                 )}
-                {(selectedtypeOption == "lead-option" ||
-                  secUnitConfig == "0") && (
-                    <>
-                      <div className="flex items-center">
-                        <label className="text-sm font-medium text-gray-500 w-32">
-                          Unit:
-                        </label>
+                {(selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") && secUnitConfig == "1" && (
+                  <>
+                    <div className="flex items-center">
+                      <label className="text-sm font-medium text-gray-500 w-32">Primary Qty:</label>
+                      <Input
+                        type="text"
+                        className={`input-focus-style w-full max-w-[150px] ${!element.productid || element.conversion_flg == "2" ? "bg-gray-300" : "bg-white"
+                          }`}
+                        name="productqty"
+                        value={element.productqty || ""}
+                        onChange={(e) => handleChange(index, e)}
+                        onKeyDown={handleKeyDown}
+                        disabled={!element.productid || element.conversion_flg == "2"}
+                      />
+                    </div>
+                    <div className="flex items-center">
+                      <label className="text-sm font-medium text-gray-500 w-32">Primary Unit:</label>
+                      {element.primary_unit_id && unitMaster.find((unit) => unit.unit_id == element.primary_unit_id) ? (
+                        <span className="text-sm flex-1">
+                          {(() => {
+                            const selectedUnit = unitMaster.find((unit) => unit.unit_id == element.primary_unit_id);
+                            return (
+                              <>
+                                {selectedUnit.unit_name}
+                                {selectedUnit.unit_symbol && ` (${selectedUnit.unit_symbol})`}
+                              </>
+                            );
+                          })()}
+                        </span>
+                      ) : element.unit &&
+                        unitMaster.find((unit) => unit.unit_name.toLowerCase() == element.unit.toLowerCase()) ? (
+                        <span className="text-sm flex-1">
+                          {(() => {
+                            const selectedUnit = unitMaster.find(
+                              (unit) => unit.unit_name.toLowerCase() == element.unit.toLowerCase()
+                            );
+                            return (
+                              <>
+                                {selectedUnit.unit_name}
+                                {selectedUnit.unit_symbol && ` (${selectedUnit.unit_symbol})`}
+                              </>
+                            );
+                          })()}
+                        </span>
+                      ) : (
                         <Select
-                          value={element.unitvalue || "0"}
-                          onValueChange={(value) =>
-                            handleChange(index, {
-                              target: { name: "unitvalue", value },
-                            })
-                          }
+                          value={element.primary_unit_id || ""}
+                          onValueChange={(value) => handleChange(index, { target: { name: "primary_unit_id", value } })}
                           disabled={!element.productid}
                         >
-                          <SelectTrigger className="input-focus-style w-full max-w-[150px]">
-                            <SelectValue placeholder="Select Unit" />
+                          <SelectTrigger
+                            className={`input-focus-style w-full max-w-[150px] ${!element.productid ? "bg-gray-300" : "bg-white"}`}
+                          >
+                            <SelectValue placeholder="Select Primary Unit" />
                           </SelectTrigger>
                           <SelectContent>
-                            {element.unit && (
-                              <SelectItem value="0">{element.unit}</SelectItem>
-                            )}
-                            {secUnitConfig == "1" && element.sec_unit && (
-                              <SelectItem value="1">
-                                {element.sec_unit}
+                            {unitMaster.map((unit) => (
+                              <SelectItem key={unit.unit_id} value={unit.unit_id}>
+                                {unit.unit_name}
+                                {unit.unit_symbol && ` (${unit.unit_symbol})`}
                               </SelectItem>
-                            )}
+                            ))}
                           </SelectContent>
                         </Select>
-                      </div>
-                      <div className="flex items-center">
-                        <label className="text-sm font-medium text-gray-500 w-32">
-                          Qty:
-                        </label>
-                        <Input
-                          type="text"
-                          className="input-focus-style w-full max-w-[150px]"
-                          name="productqty"
-                          value={element.productqty || ""}
-                          onChange={(e) => handleChange(index, e)}
-                          onKeyDown={handleKeyDown}
+                      )}
+                    </div>
+                    <div className="flex items-center">
+                      <label className="text-sm font-medium text-gray-500 w-32">Conv. Factor:</label>
+                      <Input
+                        type="text"
+                        className="input-focus-style w-full max-w-[150px] bg-gray-300"
+                        name="secondary_base_qty"
+                        value={element.secondary_base_qty || ""}
+                        onChange={(e) => handleChange(index, e)}
+                        onKeyDown={handleKeyDown}
+                        disabled={true}
+                      />
+                    </div>
+                    <div className="flex items-center">
+                      <label className="text-sm font-medium text-gray-500 w-32">Secondary Qty:</label>
+                      <Input
+                        type="text"
+                        className={`input-focus-style w-full max-w-[150px] ${!element.productid || element.conversion_flg == "1" ? "bg-gray-300" : "bg-white"
+                          }`}
+                        name="SecQtyTotal"
+                        value={element.SecQtyTotal || ""}
+                        onChange={(e) => handleChange(index, e)}
+                        onKeyDown={handleKeyDown}
+                        disabled={!element.productid || element.conversion_flg == "1"}
+                      />
+                    </div>
+                    <div className="flex items-center">
+                      <label className="text-sm font-medium text-gray-500 w-32">Secondary Unit:</label>
+                      {element.secondary_unit_id && unitMaster.find((unit) => unit.unit_id == element.secondary_unit_id) ? (
+                        <span className="text-sm flex-1">
+                          {(() => {
+                            const selectedUnit = unitMaster.find((unit) => unit.unit_id == element.secondary_unit_id);
+                            return (
+                              <>
+                                {selectedUnit.unit_name}
+                                {selectedUnit.unit_symbol && ` (${selectedUnit.unit_symbol})`}
+                              </>
+                            );
+                          })()}
+                        </span>
+                      ) : element.sec_unit &&
+                        unitMaster.find((unit) => unit.unit_name.toLowerCase() == element.sec_unit.toLowerCase()) ? (
+                        <span className="text-sm flex-1">
+                          {(() => {
+                            const selectedUnit = unitMaster.find(
+                              (unit) => unit.unit_name.toLowerCase() == element.sec_unit.toLowerCase()
+                            );
+                            return (
+                              <>
+                                {selectedUnit.unit_name}
+                                {selectedUnit.unit_symbol && ` (${selectedUnit.unit_symbol})`}
+                              </>
+                            );
+                          })()}
+                        </span>
+                      ) : (
+                        <Select
+                          value={element.secondary_unit_id || ""}
+                          onValueChange={(value) => handleChange(index, { target: { name: "secondary_unit_id", value } })}
                           disabled={!element.productid}
-                        />
-                      </div>
-                    </>
-                  )}
-                {selectedtypeOption == "salesorder-option" &&
-                  secUnitConfig == "1" && (
-                    <>
-                      <div className="flex items-center">
-                        <label className="text-sm font-medium text-gray-500 w-32">
-                          Primary Qty:
-                        </label>
-                        <Input
-                          type="text"
-                          className={`input-focus-style w-full max-w-[150px] ${!element.productid || element.conversion_flg == "2"
-                            ? "bg-gray-300"
-                            : "bg-white"
-                            }`}
-                          name="productqty"
-                          value={element.productqty || ""}
-                          onChange={(e) => handleChange(index, e)}
-                          onKeyDown={handleKeyDown}
-                          disabled={
-                            !element.productid || element.conversion_flg == "2"
-                          }
-                        />
-                      </div>
-                      <div className="flex items-center">
-                        <label className="text-sm font-medium text-gray-500 w-32">
-                          Primary Unit:
-                        </label>
-                        {element.primary_unit_id &&
-                          unitMaster.find(
-                            (unit) => unit.unit_id == element.primary_unit_id
-                          ) ? (
-                          <span className="text-sm flex-1">
-                            {(() => {
-                              const selectedUnit = unitMaster.find(
-                                (unit) =>
-                                  unit.unit_id == element.primary_unit_id
-                              );
-                              return (
-                                <>
-                                  {selectedUnit.unit_name}
-                                  {selectedUnit.unit_symbol &&
-                                    ` (${selectedUnit.unit_symbol})`}
-                                </>
-                              );
-                            })()}
-                          </span>
-                        ) : element.unit &&
-                          unitMaster.find(
-                            (unit) =>
-                              unit.unit_name.toLowerCase() ==
-                              element.unit.toLowerCase()
-                          ) ? (
-                          <span className="text-sm flex-1">
-                            {(() => {
-                              const selectedUnit = unitMaster.find(
-                                (unit) =>
-                                  unit.unit_name.toLowerCase() ==
-                                  element.unit.toLowerCase()
-                              );
-                              return (
-                                <>
-                                  {selectedUnit.unit_name}
-                                  {selectedUnit.unit_symbol &&
-                                    ` (${selectedUnit.unit_symbol})`}
-                                </>
-                              );
-                            })()}
-                          </span>
-                        ) : (
-                          <Select
-                            value={element.primary_unit_id || ""}
-                            onValueChange={(value) =>
-                              handleChange(index, {
-                                target: { name: "primary_unit_id", value },
-                              })
-                            }
-                            disabled={!element.productid}
+                        >
+                          <SelectTrigger
+                            className={`input-focus-style w-full max-w-[150px] ${!element.productid ? "bg-gray-300" : "bg-white"}`}
                           >
-                            <SelectTrigger
-                              className={`input-focus-style w-full max-w-[150px] ${!element.productid ? "bg-gray-300" : "bg-white"
-                                }`}
-                            >
-                              <SelectValue placeholder="Select Primary Unit" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {unitMaster.map((unit) => (
-                                <SelectItem
-                                  key={unit.unit_id}
-                                  value={unit.unit_id}
-                                >
-                                  {unit.unit_name}
-                                  {unit.unit_symbol && ` (${unit.unit_symbol})`}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      </div>
-                      <div className="flex items-center">
-                        <label className="text-sm font-medium text-gray-500 w-32">
-                          Conv. Factor:
-                        </label>
-                        <Input
-                          type="text"
-                          className="input-focus-style w-full max-w-[150px] bg-gray-300"
-                          name="secondary_base_qty"
-                          value={element.secondary_base_qty || ""}
-                          onChange={(e) => handleChange(index, e)}
-                          onKeyDown={handleKeyDown}
-                          disabled={true}
-                        />
-                      </div>
-                      <div className="flex items-center">
-                        <label className="text-sm font-medium text-gray-500 w-32">
-                          Secondary Qty:
-                        </label>
-                        <Input
-                          type="text"
-                          className={`input-focus-style w-full max-w-[150px] ${!element.productid || element.conversion_flg == "1"
-                            ? "bg-gray-300"
-                            : "bg-white"
-                            }`}
-                          name="SecQtyTotal"
-                          value={element.SecQtyTotal || ""}
-                          onChange={(e) => handleChange(index, e)}
-                          onKeyDown={handleKeyDown}
-                          disabled={
-                            !element.productid || element.conversion_flg == "1"
-                          }
-                        />
-                      </div>
-                      <div className="flex items-center">
-                        <label className="text-sm font-medium text-gray-500 w-32">
-                          Secondary Unit:
-                        </label>
-                        {element.secondary_unit_id &&
-                          unitMaster.find(
-                            (unit) => unit.unit_id == element.secondary_unit_id
-                          ) ? (
-                          <span className="text-sm flex-1">
-                            {(() => {
-                              const selectedUnit = unitMaster.find(
-                                (unit) =>
-                                  unit.unit_id == element.secondary_unit_id
-                              );
-                              return (
-                                <>
-                                  {selectedUnit.unit_name}
-                                  {selectedUnit.unit_symbol &&
-                                    ` (${selectedUnit.unit_symbol})`}
-                                </>
-                              );
-                            })()}
-                          </span>
-                        ) : element.sec_unit &&
-                          unitMaster.find(
-                            (unit) =>
-                              unit.unit_name.toLowerCase() ==
-                              element.sec_unit.toLowerCase()
-                          ) ? (
-                          <span className="text-sm flex-1">
-                            {(() => {
-                              const selectedUnit = unitMaster.find(
-                                (unit) =>
-                                  unit.unit_name.toLowerCase() ==
-                                  element.sec_unit.toLowerCase()
-                              );
-                              return (
-                                <>
-                                  {selectedUnit.unit_name}
-                                  {selectedUnit.unit_symbol &&
-                                    ` (${selectedUnit.unit_symbol})`}
-                                </>
-                              );
-                            })()}
-                          </span>
-                        ) : (
-                          <Select
-                            value={element.secondary_unit_id || ""}
-                            onValueChange={(value) =>
-                              handleChange(index, {
-                                target: { name: "secondary_unit_id", value },
-                              })
-                            }
-                            disabled={!element.productid}
-                          >
-                            <SelectTrigger
-                              className={`input-focus-style w-full max-w-[150px] ${!element.productid ? "bg-gray-300" : "bg-white"
-                                }`}
-                            >
-                              <SelectValue placeholder="Select Secondary Unit" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {unitMaster.map((unit) => (
-                                <SelectItem
-                                  key={unit.unit_id}
-                                  value={unit.unit_id}
-                                >
-                                  {unit.unit_name}
-                                  {unit.unit_symbol && ` (${unit.unit_symbol})`}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      </div>
-                    </>
-                  )}
-
+                            <SelectValue placeholder="Select Secondary Unit" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {unitMaster.map((unit) => (
+                              <SelectItem key={unit.unit_id} value={unit.unit_id}>
+                                {unit.unit_name}
+                                {unit.unit_symbol && ` (${unit.unit_symbol})`}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
+                  </>
+                )}
                 <div className="flex items-center">
-                  <label className="text-sm font-medium text-gray-500 w-32">
-                    MRP:
-                  </label>
+                  <label className="text-sm font-medium text-gray-500 w-32">MRP:</label>
                   <span className="text-sm">
-                    {/* {!isNaN(parseFloat(element.mrp_price))
-                      ? parseFloat(element.mrp_price).toFixed(2)
-                      : "0.00"} */}
-
-                    <span className="">
-                      {
-                        selectedtypeOption == "salesorder-option" &&
-                          secUnitConfig == "1" &&
-                          element.unit_con_mode == "3" &&
-                          element.conversion_flg == "2"
-                          ? !isNaN(parseFloat(element.sec_unit_mrp_rate))
-                            ? parseFloat(element.sec_unit_mrp_rate).toFixed(2)
-                            : "0.00"
-                          : !isNaN(parseFloat(element.mrp_price))
-                            ? parseFloat(element.mrp_price).toFixed(2)
-                            : "0.00"
-                      }
-                    </span>
+                    {(selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") &&
+                      secUnitConfig == "1" &&
+                      element.unit_con_mode == "3" &&
+                      element.conversion_flg == "2"
+                      ? !isNaN(parseFloat(element.sec_unit_mrp_rate))
+                        ? parseFloat(element.sec_unit_mrp_rate).toFixed(2)
+                        : "0.00"
+                      : !isNaN(parseFloat(element.mrp_price))
+                        ? parseFloat(element.mrp_price).toFixed(2)
+                        : "0.00"}
                   </span>
                 </div>
                 <div className="flex items-center">
-                  <label className="text-sm font-medium text-gray-500 w-32">
-                    Rate:
-                  </label>
+                  <label className="text-sm font-medium text-gray-500 w-32">Rate:</label>
                   <Input
                     type="text"
-                    className={`input-focus-style w-full max-w-[150px] ${!element.productid || !user?.isEmployee
-                      ? "bg-gray-300"
-                      : "bg-white"
-                      }`}
+                    className={`input-focus-style w-full max-w-[150px] ${!element.productid || !user?.isEmployee ? "bg-gray-300" : "bg-white"}`}
                     name={
-                      selectedtypeOption == "salesorder-option" &&
+                      (selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") &&
                         secUnitConfig == "1" &&
                         element.unit_con_mode == "3" &&
                         element.conversion_flg == "2"
@@ -2465,7 +1750,7 @@ const ProductSelectionTable = ({
                         : "rate"
                     }
                     value={
-                      selectedtypeOption == "salesorder-option" &&
+                      (selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") &&
                         secUnitConfig == "1" &&
                         element.unit_con_mode == "3" &&
                         element.conversion_flg == "2"
@@ -2478,15 +1763,10 @@ const ProductSelectionTable = ({
                   />
                 </div>
                 <div className="flex items-center">
-                  <label className="text-sm font-medium text-gray-500 w-32">
-                    Disc (%):
-                  </label>
+                  <label className="text-sm font-medium text-gray-500 w-32">Disc (%):</label>
                   <Input
                     type="text"
-                    className={`input-focus-style w-full max-w-[150px] ${!element.productid || !user?.isEmployee
-                      ? "bg-gray-300"
-                      : "bg-white"
-                      }`}
+                    className={`input-focus-style w-full max-w-[150px] ${!element.productid || !user?.isEmployee ? "bg-gray-300" : "bg-white"}`}
                     name="discount"
                     value={element.discount || ""}
                     onChange={(e) => handleChange(index, e)}
@@ -2495,15 +1775,10 @@ const ProductSelectionTable = ({
                   />
                 </div>
                 <div className="flex items-center">
-                  <label className="text-sm font-medium text-gray-500 w-32">
-                    Disc:
-                  </label>
+                  <label className="text-sm font-medium text-gray-500 w-32">Disc:</label>
                   <Input
                     type="text"
-                    className={`input-focus-style w-full max-w-[150px] ${!element.productid || !user?.isEmployee
-                      ? "bg-gray-300"
-                      : "bg-white"
-                      }`}
+                    className={`input-focus-style w-full max-w-[150px] ${!element.productid || !user?.isEmployee ? "bg-gray-300" : "bg-white"}`}
                     name="discount_amount"
                     value={element.discount_amount || ""}
                     onChange={(e) => handleChange(index, e)}
@@ -2512,26 +1787,20 @@ const ProductSelectionTable = ({
                   />
                 </div>
                 <div className="flex items-center">
-                  <label className="text-sm font-medium text-gray-500 w-32">
-                    Total:
-                  </label>
+                  <label className="text-sm font-medium text-gray-500 w-32">Total:</label>
                   <span className="text-sm">
-                    {element.totalrate > 0
-                      ? parseFloat(element.totalrate).toFixed(2)
-                      : "0.00"}
+                    {element.totalrate > 0 ? parseFloat(element.totalrate).toFixed(2) : "0.00"}
                   </span>
                 </div>
-                {selectedtypeOption == "salesorder-option" && (
+                {(selectedtypeOption == "salesorder-option" || selectedtypeOption == "quotation-option") && (
                   <div className="flex items-center">
-                    <label className="text-sm font-medium text-gray-500 w-32">
-                      Schedule Date:
-                    </label>
+                    <label className="text-sm font-medium text-gray-500 w-32">Schedule Date:</label>
                     <Input
                       type="date"
                       name="scheduleDate"
                       value={element.scheduleDate || ""}
                       onChange={(e) => handleChange(index, e)}
-                      className="w-full max-w-[150px] text-xs px-1"
+                      className="input-focus-style w-full max-w-[150px]"
                       disabled={selectedtypeOption == "lead-option"}
                     />
                   </div>
@@ -2540,15 +1809,6 @@ const ProductSelectionTable = ({
             </div>
           </div>
         ))}
-        <div className="flex justify-end">
-          <Button
-            type="button"
-            className="bg-[#287f71] hover:bg-[#20665a] text-white text-sm sm:text-base px-4 py-2"
-            onClick={addFormFields}
-          >
-            <Plus className="h-4 w-4 mr-2" /> Add Row
-          </Button>
-        </div>
       </div>
 
       {/* Desktop Add Row Button */}

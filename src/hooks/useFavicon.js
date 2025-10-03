@@ -1,23 +1,18 @@
 // src/hooks/useFavicon.js
 import { useQuery } from "@tanstack/react-query";
-import axios from "axios";
 import { useFaviconStore } from "@/stores/favicon.store";
 import { useEffect } from "react";
-import api from "@/lib/api/axios";
+import api, { ensureInitialized } from "@/lib/api/axios";
 
 const getCompanyIdentifier = () => {
   if (typeof window === "undefined") return null;
-
   const host = window.location.hostname;
-
   if (host === "localhost" || /^\d+\.\d+\.\d+\.\d+$/.test(host)) {
     return "default";
   }
-
   if (host.endsWith("ondemandcrm.co")) {
     return host.split(".")[0];
   }
-
   return host.replace(/\..+$/, "");
 };
 
@@ -33,6 +28,7 @@ export const useFavicon = () => {
       }
       setIsLoading(true);
       try {
+        await ensureInitialized();
         const response = await api.post(
           "/expo_access_api/getCompanyFavicon",
           { AUTHORIZEKEY: process.env.NEXT_PUBLIC_API_AUTH_KEY },
@@ -40,12 +36,10 @@ export const useFavicon = () => {
             timeout: 3000,
           }
         );
-
         if (response.data?.STATUS === "SUCCESS" && response.data?.DATA) {
           setFaviconUrl(response.data.DATA);
           return response.data.DATA;
         }
-
         setFaviconUrl("/favicon.ico");
         return null;
       } catch (error) {
