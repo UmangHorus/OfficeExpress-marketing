@@ -65,7 +65,14 @@ const OrderTable = () => {
   const [data, setData] = useState([]);
   const [sorting, setSorting] = useState([]);
   const [columnFilters, setColumnFilters] = useState([]);
-  const [columnVisibility, setColumnVisibility] = useState({ id: false });
+  const [columnVisibility, setColumnVisibility] = useState(() => {
+    const canSeeApproveReject =
+      appConfig?.user_role?.so?.canApproveSO == 1 && user?.isEmployee;
+
+    return {
+      approveReject: canSeeApproveReject, // show if true, hide if false
+    };
+  });
   const [globalFilter, setGlobalFilter] = useState("");
   const [pagination, setPagination] = useState({
     pageIndex: 0,
@@ -129,65 +136,88 @@ const OrderTable = () => {
     router.push("/orders/create");
   };
 
-  const handleDownloadTemplate = async (orderId) => {
-    if (!selectedTemplate) {
-      toast.error("Please select a template before downloading.");
-      return;
+ const handleDownloadTemplate = async (orderId) => {
+  if (!selectedTemplate) {
+    toast.error("Please select a template before downloading.");
+    return;
+  }
+
+  setDownloading((prev) => ({ ...prev, [orderId]: true }));
+
+  try {
+    const response = await QuotationService.downloadTemplate(
+      token,
+      orderId,
+      "21", // For Orders
+      selectedTemplate
+    );
+
+    if (response?.STATUS !== "SUCCESS") {
+      throw new Error(response?.MSG || "Failed to fetch template download path");
     }
 
-    setDownloading((prev) => ({ ...prev, [orderId]: true }));
-
-    try {
-      const response = await QuotationService.downloadTemplate(
-        token,
-        orderId,
-        "21", // Changed from 17 to 21 for orders
-        selectedTemplate
-      );
-
-      if (response?.STATUS !== "SUCCESS") {
-        throw new Error(response?.MSG || "Failed to fetch template download path");
-      }
-
-      const { transaction_id, path } = response?.DATA || {};
-      if (!path) {
-        throw new Error("No download path provided in response");
-      }
-
-      // Get the selected template name
-      const template = templateList?.data?.["21"]?.find(
-        (t) => t.id == selectedTemplate
-      );
-      const templateName = template?.name || "template";
-      // Get the full order number
-      const order = data.find((o) => o.id == orderId);
-      const fullOrderNo = order?.fullorder_no || transaction_id;
-      // Get the file extension from the path
-      const fileExtension = path.split(".").pop() || "pdf";
-
-      // Fetch the file as a blob
-      const fileResponse = await fetch(path);
-      if (!fileResponse.ok) {
-        throw new Error("Failed to fetch the file");
-      }
-      const blob = await fileResponse.blob();
-
-      // Create a URL for the blob and trigger download with dynamic filename
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `${templateName}_${fullOrderNo}.${fileExtension}`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Error downloading template:", error.message, error.response?.data);
-      toast.error(error.message || "Failed to download template");
-    } finally {
-      setDownloading((prev) => ({ ...prev, [orderId]: false }));
+    const { transaction_id, path } = response?.DATA || {};
+    if (!path) {
+      throw new Error("No download path provided in response");
     }
-  };
+
+    // ✅ Get the selected template name
+    const template = templateList?.data?.["21"]?.find(
+      (t) => t.id == selectedTemplate
+    );
+    const templateName = template?.name || "template";
+
+    // ✅ Get the full order number
+    const order = data.find((o) => o.id == orderId);
+    const fullOrderNo = order?.fullorder_no || transaction_id;
+
+    // ✅ Get file extension safely
+    const fileExtension = path.split(".").pop() || "pdf";
+
+
+    // ✅ Add cache-busting query param to prevent stale downloads
+    const downloadUrl = `${path}?t=${Date.now()}`;
+
+    // ✅ Fetch file fresh (no caching)
+    const fileResponse = await fetch(downloadUrl, {
+      cache: "no-store",
+      headers: {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        Pragma: "no-cache",
+        Expires: "0",
+      },
+    });
+
+
+    if (!fileResponse.ok) {
+      throw new Error(`Failed to fetch file (Status: ${fileResponse.status})`);
+    }
+
+    const blob = await fileResponse.blob();
+
+    // ✅ Create a URL for the blob and trigger download dynamically
+    const blobUrl = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = blobUrl;
+    link.download = `${templateName}_${fullOrderNo}.${fileExtension}`;
+    document.body.appendChild(link);
+
+    // Trigger the download
+    link.click();
+
+    // ✅ Cleanup
+    document.body.removeChild(link);
+    URL.revokeObjectURL(blobUrl);
+
+  } catch (error) {
+    console.error("❌ Error downloading template:", error.message, error);
+    toast.error(error.message || "Failed to download template");
+  } finally {
+    setDownloading((prev) => ({ ...prev, [orderId]: false }));
+  }
+};
+
 
   // Handle approve/reject action
   const handleApproveReject = (orderId, action) => {
@@ -529,7 +559,7 @@ const OrderTable = () => {
             </div>
           );
         },
-        enableHiding: false,
+        enableHiding: appConfig?.user_role?.so?.canApproveSO == 1 && user?.isEmployee,
       },
     ],
     [selectedTemplate, downloading, setSelectedOrderId, setDialogOpen, router, orderLabel, contactLabel, handleDownloadTemplate]

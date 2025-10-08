@@ -9,30 +9,67 @@ import { format } from "date-fns";
 
 const AUTHORIZE_KEY = process.env.NEXT_PUBLIC_API_AUTH_KEY || "";
 
-const getLocationPayload = async () => {
+const getStrictLocationPayload = async () => {
   try {
-    // First check if we have permission
+    // Step 1: Request or check location permission
     const permission = await requestLocationPermission();
-    if (permission !== "granted") {
-      throw new Error("LOCATION_PERMISSION_REQUIRED");
+
+    if (permission === "denied" || permission === "prompt-denied") {
+      throw new Error(
+        "LOCATION_PERMISSION_DENIED: Location access is required. Please enable location permissions in your browser or app settings."
+      );
     }
 
-    // Then get the location
+    // Step 2: Attempt to fetch current location
     const location = await getCurrentLocation();
+
+    // Step 3: Validate coordinates
+    if (
+      !location ||
+      typeof location.latitude !== "number" ||
+      typeof location.longitude !== "number"
+    ) {
+      throw new Error(
+        "LOCATION_UNAVAILABLE: Could not fetch your live GPS coordinates. Please ensure GPS is enabled and try again."
+      );
+    }
+
+    // Step 4: Validate address (fallback if address is missing but coordinates exist)
+    if (!location.address) {
+      console.warn("⚠️ Address not found, fallback to coordinates only");
+      location.address = `${location.latitude}, ${location.longitude}`;
+    }
+
+    // Step 5: Return consistent payload
     return {
-      gmapurl: location?.gmapLink || null,
-      gmapAddress: location?.address || null,
+      gmapurl:
+        location.gmapLink ||
+        `https://maps.google.com/?q=${location.latitude},${location.longitude}`,
+      gmapAddress: location.address,
       error: null,
     };
   } catch (error) {
-    console.error("Location error:", error);
-    return {
-      gmapurl: null,
-      gmapAddress: null,
-      error: error.message.includes("LOCATION_PERMISSION_REQUIRED")
-        ? "Location access is required. Please enable location permissions."
-        : "Could not determine your location. Please ensure location services are enabled.",
-    };
+    // Step 6: Handle specific error categories gracefully
+    let userMessage = "Unknown location error. Please enable GPS and retry.";
+
+    const msg = error.message.toLowerCase();
+
+    if (msg.includes("permission")) {
+      userMessage =
+        "Location access is required. Please allow location permission in your browser or app settings.";
+    } else if (msg.includes("timeout")) {
+      userMessage =
+        "Location request timed out. Please ensure GPS is enabled and try again.";
+    } else if (msg.includes("unavailable")) {
+      userMessage =
+        "Could not determine your location. Please move to an open area with better signal.";
+    } else if (msg.includes("address")) {
+      userMessage =
+        "Unable to fetch your address. Please retry after a few seconds.";
+    }
+
+    console.error("🚫 Location error:", error);
+    throw new Error(userMessage);
   }
 };
 
@@ -170,7 +207,7 @@ export const leadService = {
   getProductPriceList: async (token, productId) => {
     try {
       if (!token || !productId) {
-        throw new Error('Missing required parameters: token or productId');
+        throw new Error("Missing required parameters: token or productId");
       }
 
       const formData = new FormData();
@@ -183,17 +220,17 @@ export const leadService = {
         formData,
         {
           headers: {
-            'Content-Type': 'multipart/form-data',
+            "Content-Type": "multipart/form-data",
           },
         }
       );
 
       return response.data;
     } catch (error) {
-      console.error('Error fetching product price list:', error);
+      console.error("Error fetching product price list:", error);
       return {
-        STATUS: 'ERROR',
-        MSG: error.response?.data?.message || 'Failed to fetch price list',
+        STATUS: "ERROR",
+        MSG: error.response?.data?.message || "Failed to fetch price list",
       };
     }
   },
@@ -462,27 +499,21 @@ export const leadService = {
     formData.append("PHPTOKEN", token || "");
 
     try {
-      // Get current location with proper error handling
-      const locationPayload = await getLocationPayload();
+      // 🛰️ 1. Fetch mandatory location (blocks if unavailable)
+      const locationPayload = await getStrictLocationPayload();
 
-      // If we got an error from location, but have fallback location in orderData
-      if (locationPayload.error && location) {
-        if (location.gmapLink) {
-          formData.append("gmapurl", location.gmapLink);
-        }
-        if (location.address) {
-          formData.append("gmapAddress", location.address);
-        }
+      if (
+        !locationPayload.gmapurl ||
+        !locationPayload.gmapAddress ||
+        locationPayload.error
+      ) {
+        throw new Error(
+          "LOCATION_REQUIRED: Location could not be captured. Please ensure GPS and permissions are enabled."
+        );
       }
-      // If we got location data successfully
-      else if (!locationPayload.error) {
-        if (locationPayload.gmapurl) {
-          formData.append("gmapurl", locationPayload.gmapurl);
-        }
-        if (locationPayload.gmapAddress) {
-          formData.append("gmapAddress", locationPayload.gmapAddress);
-        }
-      }
+
+      formData.append("gmapurl", locationPayload.gmapurl);
+      formData.append("gmapAddress", locationPayload.gmapAddress);
       // If no location at all, the API will handle missing location fields
 
       // formData.append("gmapAddress", location.address);
@@ -539,27 +570,21 @@ export const leadService = {
     formData.append("AUTHORIZEKEY", AUTHORIZE_KEY);
 
     try {
-      // Get current location with proper error handling
-      const locationPayload = await getLocationPayload();
+      // 🛰️ 1. Fetch mandatory location (blocks if unavailable)
+      const locationPayload = await getStrictLocationPayload();
 
-      // If we got an error from location, but have fallback location in leadData
-      if (locationPayload.error && leadData.location) {
-        if (leadData.location.gmapLink) {
-          formData.append("gmapurl", leadData.location.gmapLink);
-        }
-        if (leadData.location.address) {
-          formData.append("gmapAddress", leadData.location.address);
-        }
+      if (
+        !locationPayload.gmapurl ||
+        !locationPayload.gmapAddress ||
+        locationPayload.error
+      ) {
+        throw new Error(
+          "LOCATION_REQUIRED: Location could not be captured. Please ensure GPS and permissions are enabled."
+        );
       }
-      // If we got location data successfully
-      else if (!locationPayload.error) {
-        if (locationPayload.gmapurl) {
-          formData.append("gmapurl", locationPayload.gmapurl);
-        }
-        if (locationPayload.gmapAddress) {
-          formData.append("gmapAddress", locationPayload.gmapAddress);
-        }
-      }
+
+      formData.append("gmapurl", locationPayload.gmapurl);
+      formData.append("gmapAddress", locationPayload.gmapAddress);
       // If no location at all, the API will handle missing location fields
 
       // Conditional fields with specified key-value logic
@@ -610,8 +635,14 @@ export const leadService = {
       //   formData.append("gmapurl", leadData.location.gmapLink);
       // }
 
-      if (leadData?.remarks) {
+      // Handle remarks based on remarkType
+      if (leadData.remarkType == "text" && leadData?.remarks) {
         formData.append("remarks", leadData?.remarks);
+      } else if (
+        leadData.remarkType == "voice" &&
+        leadData.remarksVoiceBlob?.size > 0
+      ) {
+        formData.append("remarkFile", leadData.remarksVoiceBlob);
       }
 
       // Handle patient_name based on user?.isEmployee

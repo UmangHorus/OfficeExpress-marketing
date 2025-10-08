@@ -47,7 +47,6 @@ const ProductSelectionTable = ({
   const { user = {}, appConfig = {}, token } = useLoginStore();
   const { maincompany_id, mainbranch_id } = useBasicSettingsStore();
   const { formatDateForInput } = useDateFormatter();
-  // console.log(api.defaults.baseURL, "api instance in ProductSelectionTable");
 
   const secUnitConfig = companyDetails?.sec_unit_config || "0";
   const enablepacking = companyDetails?.enable_packing;
@@ -1032,7 +1031,7 @@ const ProductSelectionTable = ({
                         ? `${baseurl}/viewimage/getproduct/${element.product_image}/normal`
                         : `${baseurl}/viewimage/getproduct/normal`
                     }
-                    className="w-12 h-12"
+                    className="border-2 border-gray-400 shadow-md mx-auto w-[40px] h-[40px] object-contain rounded-md"
                   />
                 </TableCell>
                 <TableCell
@@ -1446,7 +1445,7 @@ const ProductSelectionTable = ({
                         ? `${baseurl}/viewimage/getproduct/${element.product_image}/normal`
                         : `${baseurl}/viewimage/getproduct/normal`
                     }
-                    className="w-12 h-12"
+                    className="border-2 border-gray-400 shadow-md mx-auto w-[40px] h-[40px] object-contain rounded-md"
                   />
                 </div>
                 <div

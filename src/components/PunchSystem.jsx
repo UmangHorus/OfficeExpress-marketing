@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { punchService } from "@/lib/punchService";
 import { usePunchStore } from "@/stores/punch.store";
 import { useLoginStore } from "@/stores/auth.store";
-import useLocationPermission from "@/hooks/useLocationPermission";
 import { Coffee, AlarmClock, Clock } from "lucide-react";
 
 const PunchSystem = () => {
@@ -28,7 +27,6 @@ const PunchSystem = () => {
     setBreakId,
   } = usePunchStore();
 
-  const checkAndRequestLocation = useLocationPermission();
   const queryClient = useQueryClient();
   const { user } = useLoginStore();
   const loggedInUserId = user?.id;
@@ -105,8 +103,8 @@ const PunchSystem = () => {
         });
       }
     },
-    onError: () => {
-      toast.error("Error while breaking in!", {
+    onError: (error) => {
+      toast.error(error.message || "Error while breaking in!", {
         position: "top-right",
         duration: 3000,
       });
@@ -140,8 +138,8 @@ const PunchSystem = () => {
         });
       }
     },
-    onError: () => {
-      toast.error("Error while breaking out!", {
+    onError: (error) => {
+      toast.error(error.message || "Error while breaking out!", {
         position: "top-right",
         duration: 3000,
       });
@@ -153,8 +151,8 @@ const PunchSystem = () => {
 
   const handlePunchIn = async () => {
     try {
-      await checkAndRequestLocation("Punch-in");
       setPunchInBtn(true);
+      // No need to call checkAndRequestLocation here - punchService handles it internally
       punchInMutation.mutate();
     } catch (error) {
       toast.error(error.message, {
@@ -162,6 +160,34 @@ const PunchSystem = () => {
         duration: 3000,
       });
       setPunchInBtn(false);
+    }
+  };
+
+  const handleBreakIn = async () => {
+    try {
+      setBreakInBtn(true);
+      // No location required for break-in
+      breakInMutation.mutate();
+    } catch (error) {
+      toast.error(error.message || "Error while breaking in!", {
+        position: "top-right",
+        duration: 3000,
+      });
+      setBreakInBtn(false);
+    }
+  };
+
+  const handleBreakOut = async () => {
+    try {
+      setBreakOutBtn(true);
+      // No location required for break-out
+      breakOutMutation.mutate();
+    } catch (error) {
+      toast.error(error.message || "Error while breaking out!", {
+        position: "top-right",
+        duration: 3000,
+      });
+      setBreakOutBtn(false);
     }
   };
 
@@ -175,35 +201,29 @@ const PunchSystem = () => {
           disabled={punchInBtn}
         >
           <Clock className="h-4 w-4" />
-          Punch-In
+          {punchInBtn ? "Processing..." : "Punch-In"}
         </Button>
       )}
 
       {breakIn && (
         <Button
           className="flex items-center gap-1.5 bg-[#ec344c] hover:bg-[#d42f44] text-white font-medium py-1.5 px-2 rounded-md text-xs"
-          onClick={() => {
-            setBreakInBtn(true);
-            breakInMutation.mutate();
-          }}
+          onClick={handleBreakIn}
           disabled={breakInBtn}
         >
           <Coffee className="h-4 w-4" />
-          Break-In
+          {breakInBtn ? "Processing..." : "Break-In"}
         </Button>
       )}
 
       {breakOut && (
         <Button
           className="flex items-center gap-1.5 bg-[#ec344c] hover:bg-[#d42f44] text-white font-medium py-1.5 px-2 rounded-md text-xs"
-          onClick={() => {
-            setBreakOutBtn(true);
-            breakOutMutation.mutate();
-          }}
+          onClick={handleBreakOut}
           disabled={breakOutBtn}
         >
           <AlarmClock className="h-4 w-4" />
-          Break-Out
+          {breakOutBtn ? "Processing..." : "Break-Out"}
         </Button>
       )}
     </div>

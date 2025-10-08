@@ -269,7 +269,7 @@ const LeadTable = () => {
 
   const handleFollowupSubmit = async (followupData) => {
     try {
-      await checkAndRequestLocation("followup submission");
+      // await checkAndRequestLocation("followup submission");
 
       const followupResponse = await leadService.saveLeadFollowup(
         token,

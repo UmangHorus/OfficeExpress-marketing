@@ -3,18 +3,17 @@ import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useLoginStore } from "@/stores/auth.store";
 
-const ReactApexChart = dynamic(() => import("react-apexcharts"), {
-  ssr: false,
-});
+const ReactApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
 export default function DonutChartSales({ dashboardData, dashboardType }) {
   const { isAuthenticated, navConfig } = useLoginStore();
   const leadLabel = navConfig?.labels?.leads || "Lead";
   const orderLabel = navConfig?.labels?.orders || "Order";
+  const quotationLabel = navConfig?.labels?.Quotation_config_name || "Quotation";
 
   // Helper function for pluralization
   const pluralize = (word) => {
-    if (word.toLowerCase() === "inquiry") {
+    if (word.toLowerCase() == "inquiry") {
       return "Inquiries";
     }
     if (word.toLowerCase().endsWith("y") && !/[aeiou]y$/i.test(word)) {
@@ -49,9 +48,11 @@ export default function DonutChartSales({ dashboardData, dashboardType }) {
       tooltip: {
         y: {
           formatter: function (val) {
-            return dashboardType === "lead"
+            return dashboardType == "lead"
               ? `${val} Won ${pluralize(leadLabel).toLowerCase()}`
-              : `${val} ${pluralize(orderLabel).toLowerCase()}`;
+              : dashboardType == "quotation"
+                ? `${val} ${pluralize(quotationLabel).toLowerCase()}`
+                : `${val} ${pluralize(orderLabel).toLowerCase()}`;
           },
         },
       },
@@ -74,8 +75,7 @@ export default function DonutChartSales({ dashboardData, dashboardType }) {
 
   useEffect(() => {
     if (dashboardData) {
-      const dataKey =
-        dashboardType === "lead" ? "topSellersLead" : "top_seller";
+      const dataKey = dashboardType == "lead" ? "topSellersLead" : dashboardType == "quotation" ? "top_q_seller" : "top_seller";
       const topSellers = dashboardData?.[dataKey]?.[selectedPeriod] || [];
       const series = topSellers.map((seller) => seller?.total_orders || 0);
       const labels = topSellers.map((seller) => seller?.seller_name || "");
@@ -89,9 +89,11 @@ export default function DonutChartSales({ dashboardData, dashboardType }) {
           tooltip: {
             y: {
               formatter: function (val) {
-                return dashboardType === "lead"
+                return dashboardType == "lead"
                   ? `${val} Won ${pluralize(leadLabel).toLowerCase()}`
-                  : `${val} ${pluralize(orderLabel).toLowerCase()}`;
+                  : dashboardType == "quotation"
+                    ? `${val} ${pluralize(quotationLabel).toLowerCase()}`
+                    : `${val} ${pluralize(orderLabel).toLowerCase()}`;
               },
             },
           },
@@ -107,30 +109,24 @@ export default function DonutChartSales({ dashboardData, dashboardType }) {
         },
       }));
     }
-  }, [dashboardData, selectedPeriod, dashboardType, leadLabel, orderLabel]);
+  }, [dashboardData, selectedPeriod, dashboardType, leadLabel, orderLabel, quotationLabel]);
 
   const chartKey = `${selectedPeriod}-${chartData.series.join("-")}`;
 
   // if (!isAuthenticated) {
-  //   return (
-  //     <div className="p-4 text-red-500">
-  //       Please log in to view the sales chart.
-  //     </div>
-  //   );
+  //   return <div className="p-4 text-red-500">Please log in to view the sales chart.</div>;
   // }
 
   if (!dashboardData) {
-    return (
-      <div className="p-4 text-red-500">
-        No data available for the sales chart.
-      </div>
-    );
+    return <div className="p-4 text-red-500">No data available for the sales chart.</div>;
   }
 
   return (
     <div className="bg-white p-4 rounded-lg shadow">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-        <h2 className="text-lg font-semibold">Most Active Sales Executives</h2>
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
+        <h2 className="text-lg font-semibold">
+          {dashboardType == "quotation" ? "Most Active Executives" : "Most Active Sales Executives"}
+        </h2>
         <div className="flex items-center gap-2">
           <label
             htmlFor="donutPeriod"

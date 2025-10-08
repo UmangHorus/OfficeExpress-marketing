@@ -275,7 +275,7 @@ const ContactFollowupForm = ({
     setIsSubmitting(true);
     const followupData = {
       contactId: contact.id,
-      contactType: contact.contactType === "C" ? "1" : "6",
+      contactType: contact?.contactType == "C" ? "1" : "6",
       outcomeId,
       followupTypeId,
       description,

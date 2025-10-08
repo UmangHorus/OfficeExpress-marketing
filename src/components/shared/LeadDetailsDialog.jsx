@@ -29,6 +29,7 @@ import {
 import { leadService } from "@/lib/leadService";
 import { useLoginStore } from "@/stores/auth.store";
 import api from "@/lib/api/axios";
+import { HashLoader } from "react-spinners";
 
 const LeadDetailsDialog = ({ leadId, open, onOpenChange }) => {
   const { navConfig } = useLoginStore();
@@ -151,28 +152,32 @@ const LeadDetailsDialog = ({ leadId, open, onOpenChange }) => {
       return sum + (qty * rate - discountAmount);
     }, 0) || 0;
 
-const remarks = leadDetails?.lead_array?.remarks || "";
+  const remarks = leadDetails?.lead_array?.remarks || "";
 
-// Split into parts (before/after Remark:)
-const remarksParts = remarks.split(/<b>Remark:<\/b>/i); 
+  // Split into parts (before/after Remark:)
+  const remarksParts = remarks.split(/<b>Remark:<\/b>/i);
 
-// Clean each part (remove ALL HTML tags, trim whitespace)
-const cleanPart = (str) => 
-  str?.replace(/<[^>]+>/g, '')  // Remove all HTML tags
-     .replace(/&nbsp;/g, ' ')   // Replace &nbsp; with space
-     .trim() || "";
+  // Clean each part (remove ALL HTML tags, trim whitespace)
+  const cleanPart = (str) =>
+    str?.replace(/<[^>]+>/g, '')  // Remove all HTML tags
+      .replace(/&nbsp;/g, ' ')   // Replace &nbsp; with space
+      .trim() || "";
 
-const typeProducts = cleanPart(remarksParts[0]);
-const typeRemarks = cleanPart(remarksParts[1]);
+  const typeProducts = cleanPart(remarksParts[0]);
+  const typeRemarks = cleanPart(remarksParts[1]);
 
   if (leadLoading || attachmentLoading) {
     return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
+       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="w-[90vw] max-w-[425px] md:w-full md:max-w-[600px] lg:max-w-[1000px] max-h-[90vh] overflow-y-auto bg-white p-4 sm:p-6 rounded-lg">
           <DialogHeader>
-            <DialogTitle>Loading {leadLabel}</DialogTitle>
+            <DialogTitle className="text-lg sm:text-2xl font-bold text-center">
+              {leadLabel} Details
+            </DialogTitle>
           </DialogHeader>
-          <p className="text-center">Loading...</p>
+          <div className="flex items-center justify-center">
+            <HashLoader color="#287f71" size={60} speedMultiplier={1.5} />
+          </div>
         </DialogContent>
       </Dialog>
     );
@@ -343,7 +348,7 @@ const typeRemarks = cleanPart(remarksParts[1]);
                         );
                         const amount =
                           parseFloat(product.productqty || "0") *
-                            parseFloat(product.rate || "0") -
+                          parseFloat(product.rate || "0") -
                           discountAmount;
                         return (
                           <TableRow key={index}>
@@ -351,10 +356,7 @@ const typeRemarks = cleanPart(remarksParts[1]);
                               <img
                                 src={`${baseurl}/viewimage/getproduct/${product.product_image}/normal`}
                                 alt="Product Image"
-                                width={40}
-                                height={40}
-                                className="border-2 border-gray-400 shadow-md mx-auto"
-                              />
+                                className="border-2 border-gray-400 shadow-md mx-auto w-[40px] h-[40px] object-contain rounded-md" />
                             </TableCell>
                             <TableCell className="px-2 sm:px-4 py-2 text-xs sm:text-sm text-center">
                               {product.productname} ({product.productcode})

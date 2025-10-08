@@ -45,24 +45,24 @@ export default function DashboardSidebar({ onNavigate }) {
 
   // Permission checks
   const isEmployee = user?.isEmployee;
-  const isRestrictedUser = !user?.isEmployee && user?.type !== 5;
+  const isRestrictedUser = !user?.isEmployee && user?.type != 5;
   const showContactFollowups =
-    appConfig?.contact_rawcontact_followup === "Y" && isEmployee;
+    appConfig?.contact_rawcontact_followup == "Y" && isEmployee;
 
   const canManageOrders = () => {
-    if (appConfig?.isadmin === 1) return true;
+    if (appConfig?.isadmin == 1) return true;
     return (
       isEmployee &&
-      (soPermissions.canCreateSO === 1 || soPermissions.canViewAllSO === 1)
+      (soPermissions.canCreateSO == 1 || soPermissions.canViewAllSO == 1)
     );
   };
 
   const canManageQuotations = () => {
-    if (appConfig?.isadmin === 1) return true;
+    if (appConfig?.isadmin == 1) return true;
     return (
       isEmployee &&
-      (quotationPermissions.canCreateQuotation === 1 ||
-        quotationPermissions.canViewAllQuotation === 1 )
+      (quotationPermissions.canCreateQuotation == 1 ||
+        quotationPermissions.canViewAllQuotation == 1 )
     );
   };
 
@@ -251,8 +251,8 @@ export default function DashboardSidebar({ onNavigate }) {
   const renderSubmenu = (item) => {
     const isExpanded = expandedMenus[item.id];
     const isActive =
-      pathname === item.href ||
-      (item.submenu && item.submenu.some((sub) => pathname === sub.href));
+      pathname == item.href ||
+      (item.submenu && item.submenu.some((sub) => pathname == sub.href));
 
     return (
       <div key={item.id} className="space-y-1">
@@ -278,7 +278,7 @@ export default function DashboardSidebar({ onNavigate }) {
               <Link
                 key={subItem.id}
                 href={subItem.href}
-                className={`block px-3 py-2 text-sm rounded-md ${pathname === subItem.href ? ACTIVE_COLOR : INACTIVE_COLOR
+                className={`block px-3 py-2 text-sm rounded-md ${pathname == subItem.href ? ACTIVE_COLOR : INACTIVE_COLOR
                   }`}
                 onClick={(e) => handleNavigation(e, subItem.href)}
               >
@@ -292,7 +292,7 @@ export default function DashboardSidebar({ onNavigate }) {
   };
 
   const renderLink = (item) => {
-    const isActive = pathname === item.href;
+    const isActive = pathname == item.href;
     return (
       <div key={item.id} className="space-y-1">
         <Link
@@ -339,7 +339,7 @@ export default function DashboardSidebar({ onNavigate }) {
           <div key={item.id} className="space-y-1">
             <Link
               href={item.path}
-              className={`flex items-center px-3 py-2 text-sm rounded-md font-medium ${pathname === item.path ? ACTIVE_COLOR : INACTIVE_COLOR
+              className={`flex items-center px-3 py-2 text-sm rounded-md font-medium ${pathname == item.path ? ACTIVE_COLOR : INACTIVE_COLOR
                 }`}
               onClick={(e) => handleNavigation(e, item.path)}
             >

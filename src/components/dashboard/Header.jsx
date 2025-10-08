@@ -1,7 +1,16 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Bell, Clock, Lock, Maximize, Menu, Search, User, LogOut } from "lucide-react";
+import {
+  Bell,
+  Clock,
+  Lock,
+  Maximize,
+  Menu,
+  Search,
+  User,
+  LogOut,
+} from "lucide-react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useRouter } from "next/navigation";
 import { useLoginStore } from "@/stores/auth.store";
@@ -46,7 +55,8 @@ export default function DashboardHeader({ toggleSidebar, sidebarVisible }) {
   const dropdownTriggerRef = useRef(null);
 
   const { user = {}, appConfig = {}, token, logout } = useLoginStore();
-  const { attrId, punchOut, employeePunchoutReset, resetAttendance } = usePunchStore();
+  const { attrId, punchOut, employeePunchoutReset, resetAttendance } =
+    usePunchStore();
   const checkAndRequestLocation = useLocationPermission();
   const queryClient = useQueryClient();
   const userName = user?.name || user?.object_name;
@@ -156,7 +166,9 @@ export default function DashboardHeader({ toggleSidebar, sidebarVisible }) {
 
   const handlePunchOut = async () => {
     try {
-      await checkAndRequestLocation("Punch-out");
+      // Remove this line - punchService handles location internally
+      // await checkAndRequestLocation("Punch-out");
+
       setPunchOutBtn(true);
       punchOutMutation.mutate();
     } catch (error) {
@@ -355,14 +367,23 @@ export default function DashboardHeader({ toggleSidebar, sidebarVisible }) {
             <Button
               onClick={() => setIsPunchOutConfirmOpen(false)}
               className="bg-[#ec344c] hover:bg-[#d42f44] text-white text-xs py-1.5 px-2"
+              disabled={punchOutBtn}  // ← ADDED THIS LINE
             >
               Cancel
             </Button>
             <Button
               onClick={handlePunchOut}
-              className="bg-[#287f71] hover:bg-[#20665a] text-white text-xs py-1.5 px-2"
+              className="bg-[#287f71] hover:bg-[#090f0e] text-white text-xs py-1.5 px-2"
+              disabled={punchOutBtn}  // ← ADDED THIS LINE
             >
-              Confirm Punch Out
+              {punchOutBtn ? (  // ← ADDED CONDITIONAL RENDERING
+                <div className="flex items-center gap-2">
+                  <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  Processing...
+                </div>
+              ) : (
+                "Confirm Punch Out"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

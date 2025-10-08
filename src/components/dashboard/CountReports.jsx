@@ -17,10 +17,11 @@ export default function CountReports({ dashboardData, dashboardType }) {
   const leadLabel = navConfig?.labels?.leads || "Lead";
   const contactLabel = navConfig?.labels?.contacts || "Contact";
   const orderLabel = navConfig?.labels?.orders || "Order";
+  const quotationLabel = navConfig?.labels?.Quotation_config_name || "Quotation";
 
   // Helper function for pluralization
   const pluralize = (word) => {
-    if (word.toLowerCase() === "inquiry") {
+    if (word.toLowerCase() == "inquiry") {
       return "Inquiries";
     }
     if (word.toLowerCase().endsWith("y") && !/[aeiou]y$/i.test(word)) {
@@ -161,66 +162,79 @@ export default function CountReports({ dashboardData, dashboardType }) {
           </p>
         </div>
         {/* Badges for month or financial year */}
-        {title.includes(`New ${pluralize(leadLabel)}`) &&
-          dashboardData?.timestamp && (
-            <DateBadge
-              color={color}
-              dateText={monthNames[parseInt(dashboardData.timestamp.month) - 1]}
-            />
-          )}
-        {title.includes(`Lost ${pluralize(leadLabel)}`) &&
-          dashboardData?.timestamp && (
-            <DateBadge
-              color={color}
-              dateText={monthNames[parseInt(dashboardData.timestamp.month) - 1]}
-            />
-          )}
-        {title.includes(`Won ${pluralize(leadLabel)}`) &&
-          dashboardData?.timestamp && (
-            <DateBadge
-              color={color}
-              dateText={monthNames[parseInt(dashboardData.timestamp.month) - 1]}
-            />
-          )}
-        {title.includes(`Total ${pluralize(leadLabel)}`) &&
-          dashboardData?.years && (
-            <DateBadge color={color} dateText={getFinancialYear()} />
-          )}
-        {title.includes(`New ${pluralize(orderLabel)}`) &&
-          dashboardData?.timestamp && (
-            <DateBadge
-              color={color}
-              dateText={monthNames[parseInt(dashboardData.timestamp.month) - 1]}
-            />
-          )}
-        {title.includes(`Pending ${pluralize(orderLabel)}`) &&
-          dashboardData?.timestamp && (
-            <DateBadge
-              color={color}
-              dateText={monthNames[parseInt(dashboardData.timestamp.month) - 1]}
-            />
-          )}
-        {title.includes(`Completed ${pluralize(orderLabel)}`) &&
-          dashboardData?.timestamp && (
-            <DateBadge
-              color={color}
-              dateText={monthNames[parseInt(dashboardData.timestamp.month) - 1]}
-            />
-          )}
-        {title.includes(`Total ${pluralize(orderLabel)}`) &&
-          dashboardData?.years && (
-            <DateBadge color={color} dateText={getFinancialYear()} />
-          )}
+        {title.includes(`New ${pluralize(leadLabel)}`) && dashboardData?.timestamp && (
+          <DateBadge
+            color={color}
+            dateText={monthNames[parseInt(dashboardData.timestamp.month) - 1]}
+          />
+        )}
+        {title.includes(`Lost ${pluralize(leadLabel)}`) && dashboardData?.timestamp && (
+          <DateBadge
+            color={color}
+            dateText={monthNames[parseInt(dashboardData.timestamp.month) - 1]}
+          />
+        )}
+        {title.includes(`Won ${pluralize(leadLabel)}`) && dashboardData?.timestamp && (
+          <DateBadge
+            color={color}
+            dateText={monthNames[parseInt(dashboardData.timestamp.month) - 1]}
+          />
+        )}
+        {title.includes(`Total ${pluralize(leadLabel)}`) && dashboardData?.years && (
+          <DateBadge color={color} dateText={getFinancialYear()} />
+        )}
+        {title.includes(`New ${pluralize(orderLabel)}`) && dashboardData?.timestamp && (
+          <DateBadge
+            color={color}
+            dateText={monthNames[parseInt(dashboardData.timestamp.month) - 1]}
+          />
+        )}
+        {title.includes(`Pending ${pluralize(orderLabel)}`) && dashboardData?.timestamp && (
+          <DateBadge
+            color={color}
+            dateText={monthNames[parseInt(dashboardData.timestamp.month) - 1]}
+          />
+        )}
+        {title.includes(`Completed ${pluralize(orderLabel)}`) && dashboardData?.timestamp && (
+          <DateBadge
+            color={color}
+            dateText={monthNames[parseInt(dashboardData.timestamp.month) - 1]}
+          />
+        )}
+        {title.includes(`Total ${pluralize(orderLabel)}`) && dashboardData?.years && (
+          <DateBadge color={color} dateText={getFinancialYear()} />
+        )}
+        {title.includes(`New ${pluralize(quotationLabel)}`) && dashboardData?.timestamp && (
+          <DateBadge
+            color={color}
+            dateText={monthNames[parseInt(dashboardData.timestamp.month) - 1]}
+          />
+        )}
+        {title.includes(`Pending ${pluralize(quotationLabel)}`) && dashboardData?.timestamp && (
+          <DateBadge
+            color={color}
+            dateText={monthNames[parseInt(dashboardData.timestamp.month) - 1]}
+          />
+        )}
+        {title.includes(`Accepted ${pluralize(quotationLabel)}`) && dashboardData?.timestamp && (
+          <DateBadge
+            color={color}
+            dateText={monthNames[parseInt(dashboardData.timestamp.month) - 1]}
+          />
+        )}
+        {title.includes(`Total ${pluralize(quotationLabel)}`) && dashboardData?.years && (
+          <DateBadge color={color} dateText={getFinancialYear()} />
+        )}
       </div>
     );
   };
 
   return (
     <div className="max-w-7xl grid">
-      {dashboardType === "lead" ? (
+      {dashboardType == "lead" ? (
         <>
-          {/* Lead Dashboard Layout */}
-          <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+          {/* Lead Dashboard Layout - 2 columns on all devices */}
+          <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <StatBox
               title={`Total ${pluralize(contactLabel)}`}
               value={dashboardData?.contact?.contact}
@@ -234,7 +248,9 @@ export default function CountReports({ dashboardData, dashboardType }) {
               color="green"
             />
           </div>
-          <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+          
+          {/* Three rows with 2 boxes each */}
+          <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <StatBox
               title={`New ${pluralize(leadLabel)}`}
               value={dashboardData?.new_lead}
@@ -247,20 +263,24 @@ export default function CountReports({ dashboardData, dashboardType }) {
               icon={Package}
               color="red"
             />
+          </div>
+          
+          <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <StatBox
               title={`Won ${pluralize(leadLabel)}`}
               value={dashboardData?.won_lead}
               icon={ShoppingBag}
               color="orange"
             />
-          </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <StatBox
               title={`Lost ${pluralize(leadLabel)}`}
               value={dashboardData?.lost_lead}
               icon={CheckCircle}
               color="purple"
             />
+          </div>
+          
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <StatBox
               title="Total Lead Followup Done"
               value={dashboardData?.done_lead_followup}
@@ -275,10 +295,10 @@ export default function CountReports({ dashboardData, dashboardType }) {
             />
           </div>
         </>
-      ) : (
+      ) : dashboardType == "quotation" ? (
         <>
-          {/* Sales Dashboard Layout */}
-          <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+          {/* Quotation Dashboard Layout */}
+          <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <StatBox
               title={`Total ${pluralize(contactLabel)}`}
               value={dashboardData?.contact?.contact}
@@ -292,7 +312,53 @@ export default function CountReports({ dashboardData, dashboardType }) {
               color="teal"
             />
           </div>
-          <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <StatBox
+              title="Total Products"
+              value={dashboardData?.products}
+              icon={Package}
+              color="red"
+            />
+            <StatBox
+              title={`New ${pluralize(quotationLabel)}`}
+              value={dashboardData?.new_order}
+              icon={ShoppingBag}
+              color="orange"
+            />
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <StatBox
+              title={`Pending ${pluralize(quotationLabel)}`}
+              value={dashboardData?.quo_pending}
+              icon={Clock}
+              color="green"
+            />
+            <StatBox
+              title={`Approved ${pluralize(quotationLabel)}`}
+              value={dashboardData?.quo_accept}
+              icon={CheckCircle}
+              color="purple"
+            />
+          </div>
+        </>
+      ) : (
+        <>
+          {/* Sales Dashboard Layout */}
+          <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <StatBox
+              title={`Total ${pluralize(contactLabel)}`}
+              value={dashboardData?.contact?.contact}
+              icon={Users}
+              color="blue"
+            />
+            <StatBox
+              title={`Active ${pluralize(contactLabel)}`}
+              value={dashboardData?.active_contact}
+              icon={UserCheck}
+              color="teal"
+            />
+          </div>
+          <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <StatBox
               title="Total Products"
               value={dashboardData?.products}
@@ -306,7 +372,7 @@ export default function CountReports({ dashboardData, dashboardType }) {
               color="orange"
             />
           </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <StatBox
               title={`Pending ${pluralize(orderLabel)}`}
               value={dashboardData?.so_pending}
@@ -314,7 +380,7 @@ export default function CountReports({ dashboardData, dashboardType }) {
               color="green"
             />
             <StatBox
-              title={`Completed ${pluralize(orderLabel)}`}
+              title={`Approved ${pluralize(orderLabel)}`}
               value={dashboardData?.so_accept}
               icon={CheckCircle}
               color="purple"

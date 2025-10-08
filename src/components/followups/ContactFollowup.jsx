@@ -94,7 +94,7 @@ const ContactFollowup = () => {
     try {
       // Save Followup
       // First check location permissions
-      await checkAndRequestLocation("followup submission");
+      // await checkAndRequestLocation("followup submission");
 
       const followupResponse =
         await ContactService.saveContactRawcontactFollowUP(
@@ -333,7 +333,7 @@ const ContactFollowup = () => {
       "Key A/C Manager",
       "Created Date",
       "Created By",
-      "Followup Description",
+      "Followup Remark",
     ];
     const csvContent = [
       headers.join(","),
@@ -784,7 +784,7 @@ const ContactFollowup = () => {
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
             className="text-left w-full justify-start text-white hover:text-white hover:bg-[#4a5a6b]"
           >
-            Followup Description
+            Followup Remark
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         ),

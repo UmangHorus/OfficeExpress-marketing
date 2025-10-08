@@ -31,6 +31,10 @@ import { requestLocationPermission } from "@/utils/location";
 import useLocationPermission from "@/hooks/useLocationPermission";
 import { HashLoader } from "react-spinners";
 import { QuotationService } from "@/lib/QuotationService";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import VoiceNoteRecorder from "../inputs/VoiceNoteRecorder";
+import api from "@/lib/api/axios";
 
 const CreateOrderPage = () => {
   const { user, token, navConfig, appConfig, location } = useLoginStore();
@@ -71,7 +75,11 @@ const CreateOrderPage = () => {
   const [selectedtypeOption, setSelectedTypeOption] =
     useState("salesorder-option");
   const [isSaveContact, setIsSaveContact] = useState(false); // New state for button disable
-
+  const baseurl = api.defaults.baseURL;
+  const imageurl = api.defaults.baseURL?.replace(
+    /^https?:\/\//,
+    ""
+  );
   // Function to generate a unique ID (using timestamp for simplicity)
   const generateUniqueId = () => {
     return Date.now().toString() + Math.random().toString(36).substr(2, 9);
@@ -210,6 +218,8 @@ const CreateOrderPage = () => {
   const [selectedDivision, setSelectedDivision] = useState("");
   const [deliveryOption, setDeliveryOption] = useState("");
   const [remarks, setRemarks] = useState("");
+  const [remarksVoiceBlob, setRemarksVoiceBlob] = useState(null);
+  const [remarkType, setRemarkType] = useState("text");
   const [showAddButton, setShowAddButton] = useState(true);
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
@@ -327,6 +337,17 @@ const CreateOrderPage = () => {
     }
   }, [salesOrderData, salesOrderError]);
 
+  // Set remarkType based on salesOrderDetails.remark_file
+  useEffect(() => {
+    if (orderIdParam && salesOrderDetails?.remark_file) {
+      if (salesOrderDetails.remark_file.toLowerCase().endsWith('.mp3')) {
+        setRemarkType('voice');
+      } else {
+        setRemarkType('text');
+      }
+    }
+  }, [orderIdParam, salesOrderDetails]);
+
   const {
     data: quotationData,
     error: quotationError,
@@ -365,6 +386,7 @@ const CreateOrderPage = () => {
   const entityIdParam = orderIdParam || quotationIdParam;
   const entityDetails = orderIdParam ? salesOrderDetails : quotationDetails;
   const entityType = orderIdParam ? "order" : "order_by_quotation";
+  const shouldDisable = !!entityIdParam && entityType != "order_by_quotation";
 
   // Set selectedContact based on searchParams and contactList
   useEffect(() => {
@@ -497,6 +519,9 @@ const CreateOrderPage = () => {
             formValues: formValues,
             location: location,
             user: user,
+            // remarks: remarks,
+            // remarksVoiceBlob: remarksVoiceBlob,
+            // remarkType: remarkType,
           });
         } else if (quotationIdParam && entityType === "order_by_quotation") {
           await saveOrderByQuotationMutation.mutateAsync({
@@ -511,6 +536,8 @@ const CreateOrderPage = () => {
             selectedTerm: selectedTerm,
             customDays: customDays,
             remarks: remarks,
+            remarksVoiceBlob: remarksVoiceBlob,
+            remarkType: remarkType,
             quotationId: quotationIdParam,
           });
         } else {
@@ -531,6 +558,8 @@ const CreateOrderPage = () => {
             selectedTerm: selectedTerm,
             customDays: customDays,
             remarks: remarks,
+            remarksVoiceBlob: remarksVoiceBlob,
+            remarkType: remarkType,
             selectedWonLead: selectedWonLead,
           });
         }
@@ -714,7 +743,7 @@ const CreateOrderPage = () => {
   const handleCreateOrder = async () => {
     try {
       // Check location permissions
-      await checkAndRequestLocation(`${ordersLabel} creation`);
+      // await checkAndRequestLocation(`${ordersLabel} creation`);
 
       if (user?.isEmployee && !selectedContact) {
         toast.error(`Please select a ${contactLabel.toLowerCase()} to proceed`, {
@@ -834,6 +863,9 @@ const CreateOrderPage = () => {
             formValues: formValues,
             location: location,
             user: user,
+            // remarks: remarks,
+            // remarksVoiceBlob: remarksVoiceBlob,
+            // remarkType: remarkType,
           });
         } else if (quotationIdParam && entityType === "order_by_quotation") {
           await saveOrderByQuotationMutation.mutateAsync({
@@ -848,6 +880,8 @@ const CreateOrderPage = () => {
             selectedTerm: selectedTerm,
             customDays: customDays,
             remarks: remarks,
+            remarksVoiceBlob: remarksVoiceBlob,
+            remarkType: remarkType,
             quotationId: quotationIdParam,
           });
         } else {
@@ -868,6 +902,8 @@ const CreateOrderPage = () => {
             selectedTerm: selectedTerm,
             customDays: customDays,
             remarks: remarks,
+            remarksVoiceBlob: remarksVoiceBlob,
+            remarkType: remarkType,
             selectedWonLead: selectedWonLead,
           });
         }
@@ -881,6 +917,9 @@ const CreateOrderPage = () => {
               formValues: formValues,
               location: location,
               user: user,
+              // remarks: remarks,
+              // remarksVoiceBlob: remarksVoiceBlob,
+              // remarkType: remarkType,
             });
           } else if (quotationIdParam && entityType === "order_by_quotation") {
             await saveOrderByQuotationMutation.mutateAsync({
@@ -895,6 +934,8 @@ const CreateOrderPage = () => {
               selectedTerm: selectedTerm,
               customDays: customDays,
               remarks: remarks,
+              remarksVoiceBlob: remarksVoiceBlob,
+              remarkType: remarkType,
               quotationId: quotationIdParam,
             });
           } else {
@@ -915,6 +956,8 @@ const CreateOrderPage = () => {
               selectedTerm: selectedTerm,
               customDays: customDays,
               remarks: remarks,
+              remarksVoiceBlob: remarksVoiceBlob,
+              remarkType: remarkType,
               selectedWonLead: selectedWonLead,
             });
           }
@@ -1387,6 +1430,8 @@ const CreateOrderPage = () => {
   const resetForm = () => {
     setDeliveryOption("");
     setRemarks("");
+    setRemarksVoiceBlob(null);
+    setRemarkType("text");
     setSelectedWonLead(null);
     setWonLeadData([]);
     setShowClickHere(false);
@@ -1633,14 +1678,96 @@ const CreateOrderPage = () => {
         </div>
 
         <hr className="border-t border-gray-300" />
+
         <CardContent className="py-5">
-          <RemarksField
-            value={remarks}
-            onChange={setRemarks}
-            entityIdParam={entityIdParam}
-            entityDetails={entityDetails}
-            entityType={entityType}
-          />
+          <div className="space-y-4">
+            <RadioGroup
+              value={remarkType}
+              onValueChange={setRemarkType}
+              className="flex space-x-4 flex-wrap"
+              disabled={shouldDisable}
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem
+                  value="text"
+                  id="text"
+                  className="text-white data-[state=checked]:border-[#287f71] [&[data-state=checked]>span>svg]:fill-[#287f71] disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={shouldDisable}
+                />
+                <Label
+                  htmlFor="text"
+                  className={`text-sm cursor-pointer ${shouldDisable
+                    ? "text-gray-400 cursor-not-allowed"
+                    : "text-gray-600"
+                    }`}
+                >
+                  Text Remark
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem
+                  value="voice"
+                  id="voice"
+                  className="text-white data-[state=checked]:border-[#287f71] [&[data-state=checked]>span>svg]:fill-[#287f71] disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={shouldDisable}
+                />
+                <Label
+                  htmlFor="voice"
+                  className={`text-sm cursor-pointer ${shouldDisable
+                    ? "text-gray-400 cursor-not-allowed"
+                    : "text-gray-600"
+                    }`}
+                >
+                  Voice Remark
+                </Label>
+              </div>
+            </RadioGroup>
+
+            {remarkType === "text" ? (
+              <RemarksField
+                value={remarks}
+                onChange={setRemarks}
+                entityIdParam={entityIdParam}
+                entityDetails={entityDetails}
+                entityType={entityType}
+              />
+            ) : (
+              <div>
+                {orderIdParam && entityType == "order" && salesOrderDetails?.remark_file ? (
+                  <div className="mt-4">
+                    <p className="text-sm font-medium text-gray-700 mb-2">
+                      Saved Voice Remark:
+                    </p>
+                    <div className="w-full md:max-w-md lg:max-w-lg overflow-hidden rounded-lg border border-gray-200 p-2 bg-gray-50">
+                      <audio
+                        controls
+                        src={`${baseurl}/public/dmsfile/${imageurl}/officeexpress/salesorder/${salesOrderDetails?.remark_file}`}
+                        className="w-full h-10 md:h-9 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <VoiceNoteRecorder onBlobChange={setRemarksVoiceBlob} />
+                    {remarksVoiceBlob && (
+                      <div className="mt-4">
+                        <p className="text-sm font-medium text-gray-700 mb-2">
+                          Saved Voice Remark:
+                        </p>
+                        <div className="w-full md:max-w-md lg:max-w-lg overflow-hidden rounded-lg border border-gray-200 p-2 bg-gray-50">
+                          <audio
+                            controls
+                            src={URL.createObjectURL(remarksVoiceBlob)}
+                            className="w-full h-10 md:h-9 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 

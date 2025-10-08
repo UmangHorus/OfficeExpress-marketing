@@ -38,6 +38,8 @@ import { LeadTitleDialog } from "../shared/LeadTitleDialog";
 import { Input } from "../ui/input";
 import { requestLocationPermission } from "@/utils/location";
 import useLocationPermission from "@/hooks/useLocationPermission";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 
 const CreateLeadPage = () => {
   const router = useRouter();
@@ -70,7 +72,9 @@ const CreateLeadPage = () => {
   const [selectedCompany, setSelectedCompany] = useState("");
   const [selectedDivision, setSelectedDivision] = useState("");
   const [deliveryOption, setDeliveryOption] = useState("");
-  const [remarks, setRemarks] = useState("");
+  const [remarksText, setRemarksText] = useState("");
+  const [remarksVoiceBlob, setRemarksVoiceBlob] = useState(null);
+  const [remarkType, setRemarkType] = useState("text");
   const [showAddButton, setShowAddButton] = useState(true);
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
   const [contactList, setContactList] = useState([]);
@@ -268,7 +272,9 @@ const CreateLeadPage = () => {
           voiceNoteBlob: voiceNoteBlob,
           formValues: formValues,
           editableProducts: editableProducts,
-          remarks: remarks,
+          remarks: remarksText,
+          remarksVoiceBlob: remarksVoiceBlob,
+          remarkType: remarkType, // Added remarkType
         });
       } else {
         throw new Error(responseData?.MSG || "OTP verification failed");
@@ -327,7 +333,9 @@ const CreateLeadPage = () => {
         setSingleFile(null);
         setMultipleFiles([]);
         setVoiceNoteBlob(null);
-        setRemarks("");
+        setRemarksText("");
+        setRemarksVoiceBlob(null);
+        setRemarkType("text");
         setFormValues([
           {
             unique_id: generateUniqueId(), // Add unique_id
@@ -397,7 +405,7 @@ const CreateLeadPage = () => {
   const handleCreateLead = async () => {
     try {
       // Check location permissions
-      await checkAndRequestLocation(`${leadLabel} creation`);
+      // await checkAndRequestLocation(`${leadLabel} creation`);
 
       // Check if contact is selected
       if (user?.isEmployee && !selectedContact) {
@@ -548,7 +556,9 @@ const CreateLeadPage = () => {
           voiceNoteBlob: voiceNoteBlob,
           formValues: formValues,
           editableProducts: editableProducts,
-          remarks: remarks,
+          remarks: remarksText,
+          remarksVoiceBlob: remarksVoiceBlob,
+          remarkType: remarkType, // Added remarkType
         });
       } else {
         // Use the stored OTP setting variable
@@ -571,7 +581,9 @@ const CreateLeadPage = () => {
             voiceNoteBlob: voiceNoteBlob,
             formValues: formValues,
             editableProducts: editableProducts,
-            remarks: remarks,
+            remarks: remarksText,
+            remarksVoiceBlob: remarksVoiceBlob,
+            remarkType: remarkType, // Added remarkType
           });
         } else {
           // OTP enabled - generate OTP
@@ -885,7 +897,9 @@ const CreateLeadPage = () => {
     setMultipleFiles([]);
     setVoiceNoteBlob(null);
     setDeliveryOption("");
-    setRemarks("");
+    setRemarksText("");
+    setRemarksVoiceBlob(null);
+    setRemarkType("text");
     // setContactList([]);
     // setProductList([]);
     setFormValues(() => {
@@ -1285,14 +1299,7 @@ const CreateLeadPage = () => {
                       description="(Allow only XLS, XLSX, JPG, PNG, JPEG, or PDF file.)"
                       multiple={true}
                       onFilesSelected={setMultipleFiles}
-                      allowedTypes={[
-                        "xls",
-                        "xlsx",
-                        "jpg",
-                        "png",
-                        "jpeg",
-                        "pdf",
-                      ]}
+                      allowedTypes={["xls", "xlsx", "jpg", "png", "jpeg", "pdf"]}
                     />
                   </div>
                 </div>
@@ -1357,7 +1364,49 @@ const CreateLeadPage = () => {
         </div>
         <hr className="border-t border-gray-300" />
         <CardContent className="py-5">
-          <RemarksField value={remarks} onChange={setRemarks} />
+          <div className="space-y-4">
+            <RadioGroup
+              defaultValue="text"
+              onValueChange={setRemarkType}
+              className="flex space-x-4"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="text" id="text" className="text-white data-[state=checked]:border-[#287f71] [&[data-state=checked]>span>svg]:fill-[#287f71]" />
+                <Label htmlFor="text" className="text-sm text-gray-600 cursor-pointer">Text Remark</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="voice" id="voice" className="text-white data-[state=checked]:border-[#287f71] [&[data-state=checked]>span>svg]:fill-[#287f71]" />
+                <Label htmlFor="voice" className="text-sm text-gray-600 cursor-pointer">Voice Remark</Label>
+              </div>
+            </RadioGroup>
+            {remarkType === "text" ? (
+              <RemarksField value={remarksText} onChange={setRemarksText} />
+            ) : (
+              <div>
+                <div className="space-y-2">
+                  <VoiceNoteRecorder onBlobChange={setRemarksVoiceBlob} />
+                </div>
+
+                {remarksVoiceBlob && (
+                  <div className="mt-4">
+                    <p className="text-sm font-medium text-gray-700 mb-2">
+                      Saved Voice Remark:
+                    </p>
+
+                    {/* ✅ Responsive Audio Player */}
+                    <div className="w-full md:max-w-md lg:max-w-lg  overflow-hidden rounded-lg border border-gray-200 p-2 bg-gray-50">
+                      <audio
+                        controls
+                        src={URL.createObjectURL(remarksVoiceBlob)}
+                        className="w-full h-10 md:h-9 focus:outline-none"
+                      />
+                    </div>
+
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 

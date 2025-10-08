@@ -7,30 +7,67 @@ import { format } from "date-fns";
 
 const AUTHORIZE_KEY = process.env.NEXT_PUBLIC_API_AUTH_KEY || "";
 
-const getLocationPayload = async () => {
+const getStrictLocationPayload = async () => {
   try {
-    // First check if we have permission
+    // Step 1: Request or check location permission
     const permission = await requestLocationPermission();
-    if (permission !== "granted") {
-      throw new Error("LOCATION_PERMISSION_REQUIRED");
+
+    if (permission === "denied" || permission === "prompt-denied") {
+      throw new Error(
+        "LOCATION_PERMISSION_DENIED: Location access is required. Please enable location permissions in your browser or app settings."
+      );
     }
 
-    // Then get the location
+    // Step 2: Attempt to fetch current location
     const location = await getCurrentLocation();
+
+    // Step 3: Validate coordinates
+    if (
+      !location ||
+      typeof location.latitude !== "number" ||
+      typeof location.longitude !== "number"
+    ) {
+      throw new Error(
+        "LOCATION_UNAVAILABLE: Could not fetch your live GPS coordinates. Please ensure GPS is enabled and try again."
+      );
+    }
+
+    // Step 4: Validate address (fallback if address is missing but coordinates exist)
+    if (!location.address) {
+      console.warn("⚠️ Address not found, fallback to coordinates only");
+      location.address = `${location.latitude}, ${location.longitude}`;
+    }
+
+    // Step 5: Return consistent payload
     return {
-      gmapurl: location?.gmapLink || null,
-      gmapAddress: location?.address || null,
+      gmapurl:
+        location.gmapLink ||
+        `https://maps.google.com/?q=${location.latitude},${location.longitude}`,
+      gmapAddress: location.address,
       error: null,
     };
   } catch (error) {
-    console.error("Location error:", error);
-    return {
-      gmapurl: null,
-      gmapAddress: null,
-      error: error.message.includes("LOCATION_PERMISSION_REQUIRED")
-        ? "Location access is required. Please enable location permissions."
-        : "Could not determine your location. Please ensure location services are enabled.",
-    };
+    // Step 6: Handle specific error categories gracefully
+    let userMessage = "Unknown location error. Please enable GPS and retry.";
+
+    const msg = error.message.toLowerCase();
+
+    if (msg.includes("permission")) {
+      userMessage =
+        "Location access is required. Please allow location permission in your browser or app settings.";
+    } else if (msg.includes("timeout")) {
+      userMessage =
+        "Location request timed out. Please ensure GPS is enabled and try again.";
+    } else if (msg.includes("unavailable")) {
+      userMessage =
+        "Could not determine your location. Please move to an open area with better signal.";
+    } else if (msg.includes("address")) {
+      userMessage =
+        "Unable to fetch your address. Please retry after a few seconds.";
+    }
+
+    console.error("🚫 Location error:", error);
+    throw new Error(userMessage);
   }
 };
 
@@ -110,8 +147,6 @@ export const ContactService = {
       throw error; // Propagate error to useQuery
     }
   },
-
- 
 
   // Fetch contact and raw contact follow-up data
   getContactRawcontactFollowUP: async (token, formData) => {
@@ -215,27 +250,21 @@ export const ContactService = {
     formData.append("PHPTOKEN", token || "");
 
     try {
-      // Get current location with proper error handling
-      const locationPayload = await getLocationPayload();
+      // 🛰️ 1. Fetch mandatory location (blocks if unavailable)
+      const locationPayload = await getStrictLocationPayload();
 
-      // If we got an error from location, but have fallback location in orderData
-      if (locationPayload.error && location) {
-        if (location.gmapLink) {
-          formData.append("gmapurl", location.gmapLink);
-        }
-        if (location.address) {
-          formData.append("gmapAddress", location.address);
-        }
+      if (
+        !locationPayload.gmapurl ||
+        !locationPayload.gmapAddress ||
+        locationPayload.error
+      ) {
+        throw new Error(
+          "LOCATION_REQUIRED: Location could not be captured. Please ensure GPS and permissions are enabled."
+        );
       }
-      // If we got location data successfully
-      else if (!locationPayload.error) {
-        if (locationPayload.gmapurl) {
-          formData.append("gmapurl", locationPayload.gmapurl);
-        }
-        if (locationPayload.gmapAddress) {
-          formData.append("gmapAddress", locationPayload.gmapAddress);
-        }
-      }
+
+      formData.append("gmapurl", locationPayload.gmapurl);
+      formData.append("gmapAddress", locationPayload.gmapAddress);
       // If no location at all, the API will handle missing location fields
 
       // formData.append("gmapAddress", location?.address || "");

@@ -176,7 +176,7 @@ const LeadFollowup = () => {
       "Key A/C Manager",
       "Created Date",
       "Created By",
-      "Followup Description",
+      "Followup Remark",
       "Attachment",
     ];
     const csvContent = [
@@ -638,7 +638,7 @@ const LeadFollowup = () => {
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
             className="text-left w-full justify-start text-white hover:text-white hover:bg-[#4a5a6b]"
           >
-            Followup Description
+            Followup Remark
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         ),

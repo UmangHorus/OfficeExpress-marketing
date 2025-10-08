@@ -281,6 +281,14 @@
     width: 100% !important;
   }
 
+ /* .verify-otp-form > div:first-child {
+  justify-content: center !important;
+} */
+
+.flex.items-center.gap-2.has-\[\:disabled\]\:opacity-50 {
+    justify-content: center;
+}
+
   /* .donut-chart-dashboard .apexcharts-legend{
     height: auto !important;
     max-height: 170px;
@@ -348,3 +356,18 @@
     right: 35px !important;
   }
 }
+
+@keyframes wave {
+  0%, 100% {
+    transform: scaleY(0.3);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.animate-wave {
+  animation: wave 1s ease-in-out infinite;
+}
+
+

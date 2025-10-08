@@ -145,40 +145,61 @@ const QuotationTable = () => {
       throw new Error("No download path provided in response");
     }
 
-    // Get the selected template name
+    // Get selected template name
     const template = templateList?.data?.["17"]?.find(
       (t) => t.id == selectedTemplate
     );
     const templateName = template?.name || "template";
-    // Get the full quotation number
+
+    // Get full quotation number
     const quotation = data.find((q) => q.id == quotationId);
     const fullQuotationNo = quotation?.fullquotationno || transaction_id;
-    // Get the file extension from the path
+
+    // Get file extension
     const fileExtension = path.split(".").pop() || "pdf";
 
+    // ✅ Add cache-busting query param to prevent old file caching
+    const downloadUrl = `${path}?t=${Date.now()}`;
+
     // Fetch the file as a blob
-    const fileResponse = await fetch(path);
+    const fileResponse = await fetch(downloadUrl, {
+      cache: "no-store",
+      headers: {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        Pragma: "no-cache",
+        Expires: "0",
+      },
+    });
+
     if (!fileResponse.ok) {
-      throw new Error("Failed to fetch the file");
+      throw new Error(`Failed to fetch the file (Status: ${fileResponse.status})`);
     }
+
     const blob = await fileResponse.blob();
 
     // Create a URL for the blob and trigger download with dynamic filename
-    const url = URL.createObjectURL(blob);
+    const blobUrl = URL.createObjectURL(blob);
+
     const link = document.createElement("a");
-    link.href = url;
+    link.href = blobUrl;
     link.download = `${templateName}_${fullQuotationNo}.${fileExtension}`;
     document.body.appendChild(link);
+
+    // ✅ Trigger download programmatically
     link.click();
+
+    // Clean up
     document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    URL.revokeObjectURL(blobUrl);
+
   } catch (error) {
-    console.error("Error downloading template:", error.message, error.response?.data);
+    console.error("❌ Error downloading template:", error.message, error);
     toast.error(error.message || "Failed to download template");
   } finally {
     setDownloading((prev) => ({ ...prev, [quotationId]: false }));
   }
 };
+
 const columns = useMemo(
   () => [
     {

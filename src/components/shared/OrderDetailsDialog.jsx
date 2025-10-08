@@ -18,14 +18,20 @@ import {
 } from "@/components/ui/table";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { User, FileText, File, MessageSquare } from "lucide-react";
+import { User, FileText, File, MessageSquare, Mic } from "lucide-react";
 import OrderService from "@/lib/OrderService";
 import { useLoginStore } from "@/stores/auth.store";
 import api from "@/lib/api/axios";
+import { HashLoader } from "react-spinners";
 
 const OrderDetailsDialog = ({ salesorderId, open, onOpenChange }) => {
   const { navConfig } = useLoginStore();
   const baseurl = api.defaults.baseURL;
+  const imageurl = api.defaults.baseURL?.replace(
+    /^https?:\/\//,
+    ""
+  );
+  // Dynamic label for orders
   const ordersLabel = navConfig?.labels?.orders || "Sales Order";
 
   // Fetch sales order details
@@ -161,10 +167,12 @@ const OrderDetailsDialog = ({ salesorderId, open, onOpenChange }) => {
         <DialogContent className="w-[90vw] max-w-[425px] md:w-full md:max-w-[600px] lg:max-w-[1000px] max-h-[90vh] overflow-y-auto bg-white p-4 sm:p-6 rounded-lg">
           <DialogHeader>
             <DialogTitle className="text-lg sm:text-2xl font-bold text-center">
-              Loading {ordersLabel} Details
+              {ordersLabel} Details
             </DialogTitle>
           </DialogHeader>
-          <p className="text-center">Loading...</p>
+          <div className="flex items-center justify-center">
+            <HashLoader color="#287f71" size={60} speedMultiplier={1.5} />
+          </div>
         </DialogContent>
       </Dialog>
     );
@@ -514,9 +522,7 @@ const OrderDetailsDialog = ({ salesorderId, open, onOpenChange }) => {
                             <img
                               src={`${baseurl}/viewimage/getproduct/${element.product_image}/normal`}
                               alt="Product Image"
-                              width={40}
-                              height={40}
-                              className="border-2 border-gray-400 shadow-md mx-auto"
+                              className="border-2 border-gray-400 shadow-md mx-auto w-[40px] h-[40px] object-contain rounded-md"
                             />
                           </TableCell>
                           <TableCell className="px-2 sm:px-4 py-2 text-xs sm:text-sm text-center">
@@ -645,18 +651,35 @@ const OrderDetailsDialog = ({ salesorderId, open, onOpenChange }) => {
             </div>
           )}
 
-          {/* Remarks */}
-          {salesOrderDetails?.remarks && (
-            <div>
-              <div className="flex items-center mb-2">
-                <MessageSquare className="h-5 w-5 sm:h-6 sm:w-6 text-[#287F71] mr-2" />
-                <h3 className="text-base sm:text-lg font-semibold">Remarks</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Remarks */}
+            {salesOrderDetails?.remarks && (
+              <div>
+                <div className="flex items-center mb-2">
+                  <MessageSquare className="h-5 w-5 sm:h-6 sm:w-6 text-[#287F71] mr-2" />
+                  <h3 className="text-base sm:text-lg font-semibold">Remarks</h3>
+                </div>
+                <div className="bg-gray-100 p-3 sm:p-4 rounded-lg">
+                  <p className="text-sm sm:text-base">{salesOrderDetails?.remarks}</p>
+                </div>
               </div>
-              <div className="bg-gray-100 p-3 sm:p-4 rounded-lg">
-                <p className="text-sm sm:text-base">{salesOrderDetails?.remarks}</p>
+            )}
+
+            {/* voice remark  */}
+            {salesOrderDetails?.remark_file?.endsWith(".mp3") && (
+              <div>
+                <div className="flex items-center mb-2">
+                  <Mic className="h-5 w-5 sm:h-6 sm:w-6 text-[#287F71] mr-2" />
+                  <h3 className="text-base sm:text-lg font-semibold">Voice Remarks</h3>
+                </div>
+                <audio
+                  controls
+                  src={`${baseurl}/public/dmsfile/${imageurl}/officeexpress/salesorder/${salesOrderDetails.remark_file}`}
+                  className="w-full"
+                />
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

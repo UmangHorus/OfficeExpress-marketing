@@ -1,9 +1,9 @@
 "use client";
-import { useState, useEffect } from 'react';
-import dynamic from 'next/dynamic';
-import { useLoginStore } from '@/stores/auth.store';
+import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
+import { useLoginStore } from "@/stores/auth.store";
 
-const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
+const ReactApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
 export default function DonutChartProduct({ dashboardData, dashboardType }) {
   const { isAuthenticated } = useLoginStore();
@@ -12,8 +12,8 @@ export default function DonutChartProduct({ dashboardData, dashboardType }) {
     series: [],
     options: {
       chart: {
-        type: 'donut',
-        width: '100%',
+        type: "donut",
+        width: "100%",
         height: 400,
       },
       labels: [],
@@ -25,7 +25,7 @@ export default function DonutChartProduct({ dashboardData, dashboardType }) {
           breakpoint: 480,
           options: {
             chart: {
-              width: '100%',
+              width: "100%",
               height: 300,
             },
           },
@@ -40,27 +40,27 @@ export default function DonutChartProduct({ dashboardData, dashboardType }) {
       },
       plotOptions: {
         donut: {
-          size: '70%',
+          size: "70%",
         },
       },
     },
   });
 
-  const [selectedPeriod, setSelectedPeriod] = useState('last_7_days');
+  const [selectedPeriod, setSelectedPeriod] = useState("last_7_days");
   const periods = [
-    { value: 'last_7_days', label: 'Last 7 Days' },
-    { value: 'last_month', label: 'Last Month' },
-    { value: 'last_3_months', label: 'Last 3 Months' },
-    { value: 'last_6_months', label: 'Last 6 Months' },
-    { value: 'last_year', label: 'Last Year' },
+    { value: "last_7_days", label: "Last 7 Days" },
+    { value: "last_month", label: "Last Month" },
+    { value: "last_3_months", label: "Last 3 Months" },
+    { value: "last_6_months", label: "Last 6 Months" },
+    { value: "last_year", label: "Last Year" },
   ];
 
   useEffect(() => {
     if (dashboardData) {
-      const dataKey = dashboardType === 'lead' ? 'topLeadProducts' : 'top_products';
+      const dataKey = dashboardType == "lead" ? "topLeadProducts" : dashboardType == "quotation" ? "top_q_products" : "top_products";
       const topProducts = dashboardData?.[dataKey]?.[selectedPeriod] || [];
       const series = topProducts.map((product) => product?.total_qty || 0);
-      const labels = topProducts.map((product) => product?.product_name || '');
+      const labels = topProducts.map((product) => product?.product_name || "");
 
       setChartData((prev) => ({
         ...prev,
@@ -89,7 +89,7 @@ export default function DonutChartProduct({ dashboardData, dashboardType }) {
     }
   }, [dashboardData, selectedPeriod, dashboardType]);
 
-  const chartKey = `${selectedPeriod}-${chartData.series.join('-')}`;
+  const chartKey = `${selectedPeriod}-${chartData.series.join("-")}`;
 
   // if (!isAuthenticated) {
   //   return <div className="p-4 text-red-500">Please log in to view the product chart.</div>;
@@ -101,7 +101,7 @@ export default function DonutChartProduct({ dashboardData, dashboardType }) {
 
   return (
     <div className="bg-white p-4 rounded-lg shadow">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
         <h2 className="text-lg font-semibold">Top Products Distribution</h2>
         <div className="flex items-center gap-2">
           <label htmlFor="donutPeriod" className="font-medium whitespace-nowrap text-sm sm:text-base">

@@ -83,6 +83,8 @@ const ContactList = () => {
   const [data, setData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [visitorFound, setVisitorFound] = useState([]);
+  // Add this useEffect to check if visitor exists in contact list
+  const [showVisitorMessage, setShowVisitorMessage] = useState(false);
   const [matchedVisitor, setMatchedVisitor] = useState(null);
   const [sorting, setSorting] = useState([]);
   const [columnFilters, setColumnFilters] = useState([]);
@@ -127,65 +129,85 @@ const ContactList = () => {
     cacheTime: 0,
   });
 
-  useEffect(() => {
-    if (contactData) {
-      const responseData = Array.isArray(contactData)
-        ? contactData[0]
-        : contactData;
-      if (responseData?.STATUS === "SUCCESS") {
-        const contactList =
-          responseData.DATA?.filter(
-            (item) => item && item.contact_id && item.contact_name
-          ).map((item) => {
-            const contactTypeMap = {
-              C: "1",
-              RC: "6",
-            };
-            const mappedContactType = contactTypeMap[item.contact_type] || "";
-            const isVisitorOut =
-              responseData?.visitor_found[0]?.reference_id == item.contact_id &&
-              responseData?.visitor_found[0]?.reference_type ==
-              mappedContactType;
-            const routes =
-              item.route_values?.length > 0
-                ? item.route_values.map((route) => route.RouteMaster.route_name)
-                : [item.route_name || ""];
-            return {
-              id: item.contact_id || "",
-              name: item?.contact_name || "",
-              mobile: item.contact_mobile_no || "",
-              email: item.contact_email_address || "",
-              industry: item.industries_name || "",
-              industries_id: item.industries_id || "",
-              address_id: item.address_id || "",
-              address1: item.address1 || "",
-              area: item.area || "",
-              city: item.city_name || "",
-              zipcode: item.zipcode || "",
-              route: routes,
-              route_values: item.route_values || [],
-              state: item.state || "",
-              country: item.country || "",
-              location: item.full_address || "",
-              visitStatus: isVisitorOut ? "out" : null,
-              contact_type: item.contact_type || "",
-              contact_title: item.contact_title || "",
-              handled_by: item.handled_by || "",
-              ev_id: item.ev_id || null,
-            };
-          }) || [];
-        setVisitorFound(responseData?.visitor_found || []);
-        setData(contactList);
+ useEffect(() => {
+  if (contactData) {
+    const responseData = Array.isArray(contactData)
+      ? contactData[0]
+      : contactData;
+    if (responseData?.STATUS === "SUCCESS") {
+      const contactList =
+        responseData.DATA?.filter(
+          (item) => item && item.contact_id && item.contact_name
+        ).map((item) => {
+          const contactTypeMap = {
+            C: "1",
+            RC: "6",
+          };
+          const mappedContactType = contactTypeMap[item.contact_type] || "";
+          const isVisitorOut =
+            responseData?.visitor_found[0]?.reference_id == item.contact_id &&
+            responseData?.visitor_found[0]?.reference_type ==
+            mappedContactType;
+          const routes =
+            item.route_values?.length > 0
+              ? item.route_values.map((route) => route.RouteMaster.route_name)
+              : [item.route_name || ""];
+          return {
+            id: item.contact_id || "",
+            name: item?.contact_name || "",
+            mobile: item.contact_mobile_no || "",
+            email: item.contact_email_address || "",
+            industry: item.industries_name || "",
+            industries_id: item.industries_id || "",
+            address_id: item.address_id || "",
+            address1: item.address1 || "",
+            area: item.area || "",
+            city: item.city_name || "",
+            zipcode: item.zipcode || "",
+            route: routes,
+            route_values: item.route_values || [],
+            state: item.state || "",
+            country: item.country || "",
+            location: item.full_address || "",
+            visitStatus: isVisitorOut ? "out" : null,
+            contact_type: item.contact_type || "",
+            contact_title: item.contact_title || "",
+            handled_by: item.handled_by || "",
+            ev_id: item.ev_id || null,
+          };
+        }) || [];
+      setVisitorFound(responseData?.visitor_found || []);
+      setData(contactList);
+
+      // Moved visitor message logic here
+      const visitorFound = responseData?.visitor_found || [];
+      if (visitorFound?.length > 0 && contactList?.length > 0 && visitorFound[0]) {
+        const visitor = visitorFound[0];
+        const contactTypeMap = {
+          "1": "C",
+          "6": "RC",
+        };
+        const mappedContactType =
+          contactTypeMap[visitor?.reference_type] || visitor?.reference_type || "";
+        const foundContact = contactList.find(
+          (item) =>
+            item.id == visitor?.reference_id &&
+            item.contact_type == mappedContactType
+        );
+        setShowVisitorMessage(!!foundContact);
       } else {
-        console.error(responseData?.MSG || "Failed to fetch contact list");
-        toast.error(responseData?.MSG || "Failed to fetch contact list");
+        setShowVisitorMessage(false);
       }
+    } else {
+      console.error(responseData?.MSG || "Failed to fetch contact list");
+      toast.error(responseData?.MSG || "Failed to fetch contact list");
     }
-    if (contactError) {
-      console.error("Error fetching contacts:", contactError.message);
-      toast.error("Error fetching contacts: " + contactError.message);
-    }
-  }, [contactData, contactError]);
+  }
+  if (contactError) {
+    console.error("Error fetching contacts:", contactError.message);
+    toast.error("Error fetching contacts: " + contactError.message);
+  }
+}, [contactData, contactError]);
 
   // const {
   //   data: routeData,
@@ -314,6 +336,28 @@ const ContactList = () => {
       }
     }
   }, [visitorFound]);
+
+  // for found is that visitor exist in contact list or not
+  // useEffect(() => {
+  //   if (visitorFound.length > 0 && data.length > 0) {
+  //     const visitor = visitorFound[0];
+  //     const contactTypeMap = {
+  //       "1": "C",
+  //       "6": "RC"
+  //     };
+  //     const mappedContactType = contactTypeMap[visitor?.reference_type] || visitor?.reference_type;
+
+  //     const foundContact = data.find(
+  //       (item) =>
+  //         item.id == visitor?.reference_id &&
+  //         item.contact_type == mappedContactType
+  //     );
+
+  //     setShowVisitorMessage(!!foundContact);
+  //   } else {
+  //     setShowVisitorMessage(false);
+  //   }
+  // }, [visitorFound, data]);
 
   const addContactMutation = useMutation({
     mutationFn: async ({ data, selectedcompany, inputvalue }) => {
@@ -648,7 +692,7 @@ const ContactList = () => {
 
   const handleFollowupSubmit = async (followupData) => {
     try {
-      await checkAndRequestLocation("followup submission");
+      // await checkAndRequestLocation("followup submission");
 
       const followupResponse =
         await ContactService.saveContactRawcontactFollowUP(
@@ -711,6 +755,7 @@ const ContactList = () => {
     () => {
 
       return [
+        // Update your Visit In button logic in the columns definition:
         {
           id: "visit",
           header: "Visit",
@@ -721,10 +766,17 @@ const ContactList = () => {
               RC: "6",
             };
             const mappedContactType = contactTypeMap[lead.contact_type] || "";
-            const isVisitorMismatch =
-              visitorFound.length > 0 &&
-              (lead.id != visitorFound[0]?.reference_id ||
-                mappedContactType != visitorFound[0]?.reference_type);
+
+            // Check if there's an active visitor AND if it matches this contact
+            const hasActiveVisitor = showVisitorMessage;
+            const isCurrentContactVisitor =
+              hasActiveVisitor &&
+              lead.id == visitorFound[0]?.reference_id &&
+              mappedContactType == visitorFound[0]?.reference_type;
+
+            // Disable Visit In if there's an active visitor that's NOT this contact
+            const shouldDisableVisitIn = hasActiveVisitor && !isCurrentContactVisitor;
+
             if (lead.visitStatus === "out") {
               return (
                 <Button
@@ -734,7 +786,7 @@ const ContactList = () => {
                   onClick={() =>
                     handleVisitOut(lead.id, lead.contact_type, lead.name)
                   }
-                  disabled={disabledVisitOut || isVisitorMismatch}
+                  disabled={disabledVisitOut || shouldDisableVisitIn}
                 >
                   Visit Out
                 </Button>
@@ -749,7 +801,7 @@ const ContactList = () => {
                   : "bg-[#287f71] hover:bg-[#20665a]"
                   }`}
                 onClick={() => handleVisitIn(lead.id, lead.contact_type)}
-                disabled={disabledVisitIn || isVisitorMismatch}
+                disabled={disabledVisitIn || shouldDisableVisitIn}
               >
                 Visit In
               </Button>
@@ -1076,7 +1128,8 @@ const ContactList = () => {
 
   return (
     <div className="w-full">
-      {visitorFound.length > 0 && (
+      {/* Replace your current visitor message with this: */}
+      {showVisitorMessage && (
         <div className="mb-4 p-3 bg-yellow-100 border-l-4 border-yellow-500">
           <p className="font-bold text-yellow-700">
             {visitorFound[0].reference_name ? (
@@ -1106,7 +1159,7 @@ const ContactList = () => {
         {/* Search and Route Selector */}
         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
           <Input
-            placeholder={`Search ${contactLabel}...`}
+            placeholder="Search across all fields..."
             value={globalFilter ?? ""}
             onChange={(event) => setGlobalFilter(event.target.value)}
             className="w-full sm:max-w-sm bg-[#fff]"

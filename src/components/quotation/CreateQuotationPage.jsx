@@ -8,7 +8,7 @@ import DivisionSelector from "@/components/selectors/DivisionSelector";
 import PaymentTermsSelector from "@/components/selectors/PaymentTermsSelector";
 import QuotationDeliveryOptions from "@/components/selectors/QuotationDeliveryOptions";
 import RemarksField from "@/components/inputs/RemarksField";
-import { Columns2 } from "lucide-react";
+import { Columns2, FileText } from "lucide-react";
 import ProductSelectionTable from "@/components/lead/ProductSelectionTable";
 import { Button } from "@/components/ui/button";
 import { ContactSearch } from "@/components/inputs/search";
@@ -28,9 +28,13 @@ import { ContactService } from "@/lib/ContactService";
 import { requestLocationPermission } from "@/utils/location";
 import useLocationPermission from "@/hooks/useLocationPermission";
 import { HashLoader } from "react-spinners";
-import { QuotationService } from "@/lib/QuotationService";
 import { leadService } from "@/lib/leadService";
 import OrderService from "@/lib/OrderService";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import VoiceNoteRecorder from "../inputs/VoiceNoteRecorder";
+import api from "@/lib/api/axios";
+import { QuotationService } from "@/lib/QuotationService";
 
 const CreateQuotationPage = () => {
   const { user, token, navConfig, appConfig, location } = useLoginStore();
@@ -50,6 +54,11 @@ const CreateQuotationPage = () => {
   );
   const quotationLabel = useLoginStore(
     (state) => state.navConfig?.labels?.Quotation_config_name || "Quotation"
+  );
+  const baseurl = api.defaults.baseURL;
+  const imageurl = api.defaults.baseURL?.replace(
+    /^https?:\/\//,
+    ""
   );
   const checkAndRequestLocation = useLocationPermission();
   const router = useRouter();
@@ -202,6 +211,8 @@ const CreateQuotationPage = () => {
   const [selectedCompany, setSelectedCompany] = useState("");
   const [selectedDivision, setSelectedDivision] = useState("");
   const [remarks, setRemarks] = useState("");
+  const [remarksVoiceBlob, setRemarksVoiceBlob] = useState(null);
+  const [remarkType, setRemarkType] = useState("text");
   const [showAddButton, setShowAddButton] = useState(true);
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
@@ -428,6 +439,9 @@ const CreateQuotationPage = () => {
             formValues: formValues,
             location: location,
             user: user,
+            // remarks: remarks,
+            // remarksVoiceBlob: remarksVoiceBlob,
+            // remarkType: remarkType,
           });
         } else {
           await saveQuotationMutation.mutateAsync({
@@ -446,6 +460,8 @@ const CreateQuotationPage = () => {
             selectedTerm: selectedTerm,
             customDays: customDays,
             remarks: remarks,
+            remarksVoiceBlob: remarksVoiceBlob,
+            remarkType: remarkType,
             selectedWonLead: selectedWonLead,
           });
         }
@@ -481,6 +497,8 @@ const CreateQuotationPage = () => {
         setSelectedWonLead(null);
         setWonLeadData([]);
         setShowClickHere(false);
+        setRemarksVoiceBlob(null);
+        setRemarkType("text");
 
         if (contactIdParam && contactTypeParam && evIdParam) {
           try {
@@ -554,6 +572,8 @@ const CreateQuotationPage = () => {
         setSelectedWonLead(null);
         setWonLeadData([]);
         setShowClickHere(false);
+        setRemarksVoiceBlob(null);
+        setRemarkType("text");
 
         // Clear quotationDetails query cache to ensure fresh fetch on next edit
         queryClient.removeQueries({ queryKey: ["quotationDetails", quotationIdParam] });
@@ -574,7 +594,7 @@ const CreateQuotationPage = () => {
 
   const handleCreateQuotation = async () => {
     try {
-      await checkAndRequestLocation(`${quotationsLabel} creation`);
+      // await checkAndRequestLocation(`${quotationsLabel} creation`);
 
       if (user?.isEmployee && !selectedContact) {
         toast.error(`Please select a ${contactLabel.toLowerCase()} to proceed`, {
@@ -681,6 +701,9 @@ const CreateQuotationPage = () => {
             formValues: formValues,
             location: location,
             user: user,
+            // remarks: remarks,
+            // remarksVoiceBlob: remarksVoiceBlob,
+            // remarkType: remarkType,
           });
         } else {
           await saveQuotationMutation.mutateAsync({
@@ -699,6 +722,8 @@ const CreateQuotationPage = () => {
             selectedTerm: selectedTerm,
             customDays: customDays,
             remarks: remarks,
+            remarksVoiceBlob: remarksVoiceBlob,
+            remarkType: remarkType,
             selectedWonLead: selectedWonLead,
           });
         }
@@ -710,6 +735,9 @@ const CreateQuotationPage = () => {
               formValues: formValues,
               location: location,
               user: user,
+              // remarks: remarks,
+              // remarksVoiceBlob: remarksVoiceBlob,
+              // remarkType: remarkType,
             });
           } else {
             await saveQuotationMutation.mutateAsync({
@@ -728,6 +756,8 @@ const CreateQuotationPage = () => {
               selectedTerm: selectedTerm,
               customDays: customDays,
               remarks: remarks,
+              remarksVoiceBlob: remarksVoiceBlob,
+              remarkType: remarkType,
               selectedWonLead: selectedWonLead,
             });
           }
@@ -1170,6 +1200,8 @@ const CreateQuotationPage = () => {
 
   const resetForm = () => {
     setRemarks("");
+    setRemarksVoiceBlob(null);
+    setRemarkType("text");
     setSelectedWonLead(null);
     setWonLeadData([]);
     setShowClickHere(false);
@@ -1233,6 +1265,18 @@ const CreateQuotationPage = () => {
     resetForm();
   }, []);
 
+  useEffect(() => {
+    if (quotationIdParam && quotationDetails) {
+      if (quotationDetails?.remark_file) {
+        setRemarkType('voice');
+      } else {
+        setRemarkType('text');
+      }
+    }
+  }, [quotationIdParam, quotationDetails]);
+
+  const shouldDisable = !!quotationIdParam && quotationDetails;
+
   if (quotationIdParam && !quotationDetails) {
     return (
       <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-80 z-10">
@@ -1244,7 +1288,8 @@ const CreateQuotationPage = () => {
   return (
     <div className="space-y-6">
       <h1 className="text-lg font-semibold text-[#4a5a6b] flex items-center gap-2">
-        <Columns2 />
+        {/* <Columns2 />   */}
+        <FileText />
         {quotationIdParam ? "Edit" : "Create New"} Quotation
       </h1>
 
@@ -1417,13 +1462,94 @@ const CreateQuotationPage = () => {
 
         <hr className="border-t border-gray-300" />
         <CardContent className="py-5">
-          <RemarksField
-            value={remarks}
-            onChange={setRemarks}
-            entityIdParam={quotationIdParam}
-            entityDetails={quotationDetails}
-            entityType="quotation"
-          />
+          <div className="space-y-4">
+            <RadioGroup
+              value={remarkType}
+              onValueChange={setRemarkType}
+              className="flex space-x-4 flex-wrap"
+              disabled={shouldDisable}
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem
+                  value="text"
+                  id="text"
+                  className="text-white data-[state=checked]:border-[#287f71] [&[data-state=checked]>span>svg]:fill-[#287f71] disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={shouldDisable}
+                />
+                <Label
+                  htmlFor="text"
+                  className={`text-sm cursor-pointer ${shouldDisable
+                    ? "text-gray-400 cursor-not-allowed"
+                    : "text-gray-600"
+                    }`}
+                >
+                  Text Remark
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem
+                  value="voice"
+                  id="voice"
+                  className="text-white data-[state=checked]:border-[#287f71] [&[data-state=checked]>span>svg]:fill-[#287f71] disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={shouldDisable}
+                />
+                <Label
+                  htmlFor="voice"
+                  className={`text-sm cursor-pointer ${shouldDisable
+                    ? "text-gray-400 cursor-not-allowed"
+                    : "text-gray-600"
+                    }`}
+                >
+                  Voice Remark
+                </Label>
+              </div>
+            </RadioGroup>
+
+            {remarkType === "text" ? (
+              <RemarksField
+                value={remarks}
+                onChange={setRemarks}
+                entityIdParam={quotationIdParam}
+                entityDetails={quotationDetails}
+                entityType="quotation"
+              />
+            ) : (
+              <div>
+                {quotationIdParam && quotationDetails?.remark_file ? (
+                  <div className="mt-4">
+                    <p className="text-sm font-medium text-gray-700 mb-2">
+                      Saved Voice Remark:
+                    </p>
+                    <div className="w-full md:max-w-md lg:max-w-lg overflow-hidden rounded-lg border border-gray-200 p-2 bg-gray-50">
+                      <audio
+                        controls
+                        src={`${baseurl}/public/dmsfile/${imageurl}/officeexpress/quotation/${quotationDetails?.remark_file}`}
+                        className="w-full h-10 md:h-9 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <VoiceNoteRecorder onBlobChange={setRemarksVoiceBlob} />
+                    {remarksVoiceBlob && (
+                      <div className="mt-4">
+                        <p className="text-sm font-medium text-gray-700 mb-2">
+                          Saved Voice Remark:
+                        </p>
+                        <div className="w-full md:max-w-md lg:max-w-lg overflow-hidden rounded-lg border border-gray-200 p-2 bg-gray-50">
+                          <audio
+                            controls
+                            src={URL.createObjectURL(remarksVoiceBlob)}
+                            className="w-full h-10 md:h-9 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 

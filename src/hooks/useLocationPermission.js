@@ -1,17 +1,20 @@
-// useLocationPermission.js
-import { requestLocationPermission } from "@/utils/location";
+import { requestLocationPermission, getCurrentLocation } from "@/utils/location";
 import { useCallback } from "react";
 
 const useLocationPermission = () => {
   const checkAndRequestLocation = useCallback(async (context = "operation") => {
     try {
       const permission = await requestLocationPermission();
-      if (permission !== "granted") {
+      
+      if (permission === "denied") {
         throw new Error(
           `Location access is required for ${context}. Please enable location permissions in your browser settings.`
         );
       }
-      return true;
+      
+      // Get fresh location every time - no caching
+      const location = await getCurrentLocation();
+      return location;
     } catch (error) {
       throw error;
     }

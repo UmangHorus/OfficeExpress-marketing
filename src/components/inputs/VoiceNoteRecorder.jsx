@@ -19,19 +19,31 @@ const VoiceNoteRecorder = ({ onBlobChange }) => {
   return (
     <div className="space-y-4">
       {error && <p className="text-red-500">{error}</p>}
-      <Button
-        className="flex items-center gap-2 px-4 py-2 bg-[#287f71] text-white rounded-md hover:bg-[#20665a] transition-colors [&_svg]:size-6"
-        onClick={isRecording ? stopRecording : startRecording}
-        type="button"
-      >
-        <Mic size={24} className="size-6" />
-        {isRecording ? 'Stop Recording' : 'Start Recording'}
-      </Button>
-      {/* {blob && (
-        <audio controls src={URL.createObjectURL(blob)} className="mt-2 w-full">
-          Your browser does not support the audio element.
-        </audio>
-      )} */}
+      <div className="flex items-center gap-4">
+        <Button
+          className="flex items-center gap-2 px-4 py-2 bg-[#287f71] text-white rounded-md hover:bg-[#20665a] transition-colors [&_svg]:size-6"
+          onClick={isRecording ? stopRecording : startRecording}
+          type="button"
+        >
+          <Mic size={24} className="size-6" />
+          {isRecording ? 'Stop Recording' : 'Start Recording'}
+        </Button>
+        
+        {/* Wave Animation */}
+        {isRecording && (
+          <div className="flex items-center gap-1">
+            {[...Array(5)].map((_, i) => (
+              <div
+                key={i}
+                className="w-1 h-6 bg-[#287f71] rounded-full animate-wave"
+                style={{
+                  animationDelay: `${i * 0.1}s`,
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

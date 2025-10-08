@@ -303,12 +303,15 @@ const DeliveryOptions = ({
                 id={`bill-to-${option.id}`}
                 checked={isBillToChecked}
                 onClick={() => handleBillToChange(option.id)}
-                className="text-white data-[state=checked]:border-[#287f71] [&[data-state=checked]>span>svg]:fill-[#287f71]"
+                className="text-white data-[state=checked]:border-[#287f71] [&[data-state=checked]>span>svg]:fill-[#287f71] disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={shouldDisable}
               />
               <Label
                 htmlFor={`bill-to-${option.id}`}
-                className="text-sm text-gray-600 cursor-pointer"
+                className={`text-sm cursor-pointer ${shouldDisable
+                    ? "text-gray-400 cursor-not-allowed"
+                    : "text-gray-600"
+                  }`}
               >
                 Bill to Address
               </Label>
@@ -319,12 +322,15 @@ const DeliveryOptions = ({
                 id={`ship-to-${option.id}`}
                 checked={isShipToChecked}
                 onClick={() => handleShipToChange(option.id)}
-                className="text-white data-[state=checked]:border-[#287f71] [&[data-state=checked]>span>svg]:fill-[#287f71]"
+                className="text-white data-[state=checked]:border-[#287f71] [&[data-state=checked]>span>svg]:fill-[#287f71] disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={shouldDisable}
               />
               <Label
                 htmlFor={`ship-to-${option.id}`}
-                className="text-sm text-gray-600 cursor-pointer"
+                className={`text-sm cursor-pointer ${shouldDisable
+                    ? "text-gray-400 cursor-not-allowed"
+                    : "text-gray-600"
+                  }`}
               >
                 Ship to Address
               </Label>
